@@ -80,7 +80,8 @@ class ProfilnaSlikaController extends Controller
         $user->save();
 
         return response()->json([
-            'message' => 'Profilna slika uspešno obrisana.',
+            'message' => 'Profilna slika uspešno obrisana. Tamara',
+
         ]);
     }
 }
