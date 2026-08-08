@@ -23,6 +23,7 @@ php artisan cache:clear
 #Ovo sprečava da Laravel pokuša migraciju pre nego što MySQL uopšte ustane
 echo "Pokrećem migracije baze podataka (ako ima novih)..."
 php artisan migrate --force
+php artisan db:seed --force
 
 #Pokreni zvaničnu Apache komandu (mora biti zadnja linija)
 echo "Startujem Apache server..."
