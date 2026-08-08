@@ -87,7 +87,10 @@ class AuthController extends Controller
         ]);
 
         \Illuminate\Auth\Notifications\ResetPassword::createUrlUsing(function ($user, string $token) {
-        return 'http://localhost:8000/api/reset-lozinka?token=' . $token . '&email=' . $user->email;
+        // FRONTEND_URL treba da bude podešen u .env (npr. https://tvoj-frontend.netlify.app)
+        // Link vodi na FRONTEND stranicu sa formom za novu lozinku, ne na API rutu direktno.
+        $frontendUrl = rtrim(config('app.frontend_url', 'http://localhost:5173'), '/');
+        return $frontendUrl . '/reset-lozinka?token=' . $token . '&email=' . urlencode($user->email);
         });
 
         $status = \Illuminate\Support\Facades\Password::sendResetLink(

@@ -99,7 +99,20 @@ class GrupnaTransakcijaController extends Controller
         $user = $request->user();
         $klijent = Klijent::where('user_id', $user->id)->first();
 
+        if (!$klijent) {
+            return response()->json(['message' => 'Korisnik nije klijent.'], 403);
+        }
+
         $grupa = GrupnaTransakcija::with('udeli.klijent.user')->findOrFail($id);
+
+        // Proveri da li je korisnik kreator ili clan grupe
+        $jeKreator = $grupa->kreator_id === $klijent->id;
+        $jeClan = $grupa->udeli->contains('klijent_id', $klijent->id);
+
+        if (!$jeKreator && !$jeClan) {
+            return response()->json(['message' => 'Nemate pristup ovoj grupi.'], 403);
+        }
+
         $grupa->procenat_prikupljeno = $grupa->proveriStanje();
 
         return response()->json($grupa);

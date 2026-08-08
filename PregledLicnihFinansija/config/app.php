@@ -56,6 +56,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Frontend URL
+    |--------------------------------------------------------------------------
+    |
+    | URL na kojoj je hostovan frontend (SPA). Koristi se za linkove koji
+    | moraju da vode korisnika nazad na frontend (npr. reset lozinke).
+    | Podesi FRONTEND_URL u .env fajlu za produkciju.
+    |
+    */
+
+    'frontend_url' => env('FRONTEND_URL', 'http://localhost:5173'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |
