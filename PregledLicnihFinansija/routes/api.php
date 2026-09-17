@@ -19,6 +19,11 @@ use App\Http\Middleware\IsAdmin;
 
 use App\Http\Middleware\IsPremium;
 
+//Health check - koristi se za automatski "ping" da Supabase baza ne pauzira zbog neaktivnosti
+Route::get('/health', function () {
+    \Illuminate\Support\Facades\DB::select('SELECT 1');
+    return response()->json(['status' => 'ok']);
+});
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
