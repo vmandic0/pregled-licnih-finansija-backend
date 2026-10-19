@@ -12,73 +12,28 @@ class UserSeeder extends Seeder
 {
     public function run(): void
     {
-        // Poznati test korisnici sa fiksnim emailovima
+        // Admin: podaci iz env varijabli (repo je javan, lozinka ne sme u kod)
+        $adminEmail = env('ADMIN_EMAIL');
+        $adminPassword = env('ADMIN_PASSWORD');
 
-        // Basic klijent
-        $basicUser = User::create([
-            'name' => 'Basic Klijent',
-            'email' => 'basic@test.com',
-            'password' => Hash::make('password123'),
-            'type' => 'klijent',
-        ]);
-        Klijent::create([
-            'user_id' => $basicUser->id,
-            'net_worth' => 0,
-            'premium_klijent' => false,
-            'preferred_currency' => 'RSD',
-        ]);
-
-        // 3 premium klijenta sa fiksnim emailovima
-        $premiumData = [
-            ['name' => 'Premium Klijent', 'email' => 'premium@test.com'],
-            ['name' => 'Premium Klijent 2', 'email' => 'premium2@test.com'],
-            ['name' => 'Premium Klijent 3', 'email' => 'premium3@test.com'],
-        ];
-
-        foreach ($premiumData as $data) {
-            $user = User::create([
-                'name' => $data['name'],
-                'email' => $data['email'],
-                'password' => Hash::make('password123'),
-                'type' => 'klijent',
-            ]);
-            Klijent::create([
-                'user_id' => $user->id,
-                'net_worth' => 0,
-                'premium_klijent' => true,
-                'preferred_currency' => 'RSD',
-            ]);
+        if ($adminEmail && $adminPassword) {
+            $admin = User::firstOrCreate(
+                ['email' => $adminEmail],
+                ['name' => 'Administrator', 'password' => Hash::make($adminPassword), 'type' => 'administrator']
+            );
+            Administrator::firstOrCreate(['user_id' => $admin->id]);
+        } else {
+            $this->command->warn('ADMIN_EMAIL / ADMIN_PASSWORD nisu postavljeni - admin nije kreiran.');
         }
 
-        // Administrator
-        $adminUser = User::create([
-            'name' => 'Test Admin',
-            'email' => 'admin@test.com',
-            'password' => Hash::make('password123'),
-            'type' => 'administrator',
-        ]);
-        Administrator::create([
-            'user_id' => $adminUser->id,
-        ]);
-
-        // 5 random basic klijenata pomocu factory
-        User::factory(5)->create(['type' => 'klijent'])->each(function ($user) {
-            Klijent::create([
-                'user_id' => $user->id,
-                'net_worth' => 0,
-                'premium_klijent' => false,
-                'preferred_currency' => 'RSD',
-            ]);
-        });
-
-        // 5 random premium klijenata pomocu factory
-        User::factory(5)->create(['type' => 'klijent'])->each(function ($user) {
-            Klijent::create([
-                'user_id' => $user->id,
-                'net_worth' => 0,
-                'premium_klijent' => true,
-                'preferred_currency' => 'RSD',
-            ]);
-        });
+        // Premium demo nalog za posetioce CV-ja (javni podaci, namerno)
+        $demo = User::firstOrCreate(
+            ['email' => 'demo@fintrack.test'],
+            ['name' => 'Demo Korisnik', 'password' => Hash::make('demo1234'), 'type' => 'klijent']
+        );
+        Klijent::firstOrCreate(
+            ['user_id' => $demo->id],
+            ['net_worth' => 0, 'premium_klijent' => true, 'preferred_currency' => 'RSD']
+        );
     }
 }

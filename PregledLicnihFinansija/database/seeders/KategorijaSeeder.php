@@ -35,12 +35,13 @@ class KategorijaSeeder extends Seeder
             ['naziv' => 'Deciji troskovi', 'tip' => 'trosak'],
             ['naziv' => 'Nepredvidjeni trosak', 'tip' => 'trosak'],
             ['naziv' => 'Nepredvidjeni prihod', 'tip' => 'prihod'],
+            ['naziv' => 'Subskripcije', 'tip' => 'trosak'],
 
 
         ];
 
-        foreach($kategorije as $kategorija) {
-            Kategorija::create($kategorija);
+        foreach ($kategorije as $kategorija) {
+            Kategorija::firstOrCreate($kategorija);
         }
     }
 }
