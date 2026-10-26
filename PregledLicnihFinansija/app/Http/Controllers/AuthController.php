@@ -37,6 +37,8 @@ class AuthController extends Controller
         ]);
         //Automatski login za klijenta
         Auth::login($user);
+        $request->session()->regenerate();
+        $user->load('klijent');
         //Vraća se json sa porukom o uspešnoj registraciji
         return response()->json([
             'message' => 'Uspešna registracija!',
@@ -53,13 +55,12 @@ class AuthController extends Controller
             ]);
 
             if (Auth::attempt(['email' => $request->email, 'password' => $request->password])) {
+                $request->session()->regenerate();
                 $user = Auth::user();
                 $user->load('klijent');
-                $token = $user->createToken('auth_token')->plainTextToken;
 
                 return response()->json([
                     'message' => 'Uspešna prijava!',
-                    'token' => $token,
                     'user' => $user,
                 ]);
             }
@@ -72,7 +73,9 @@ class AuthController extends Controller
     //Odjava
    public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        Auth::guard('web')->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
         
         return response()->json([
             'message' => 'Uspešno ste se odjavili.',

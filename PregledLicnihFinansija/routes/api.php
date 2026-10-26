@@ -30,7 +30,7 @@ Route::post('/reset-lozinka', [AuthController::class, 'resetujLozinku'])->middle
 Route::middleware(['auth:sanctum', 'throttle:authenticated-api'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/user', function (Request $request) {
-        return $request->user();
+        return $request->user()->load('klijent');
     });
 
     // Kategorije
