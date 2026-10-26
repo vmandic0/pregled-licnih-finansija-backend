@@ -57,6 +57,16 @@ class AuthController extends Controller
             if (Auth::attempt(['email' => $request->email, 'password' => $request->password])) {
                 $request->session()->regenerate();
                 $user = Auth::user();
+                if ($user->isAdmin()) {
+                    Klijent::firstOrCreate(
+                        ['user_id' => $user->id],
+                        [
+                            'net_worth' => 0,
+                            'premium_klijent' => true,
+                            'preferred_currency' => 'RSD',
+                        ],
+                    );
+                }
                 $user->load('klijent');
 
                 return response()->json([

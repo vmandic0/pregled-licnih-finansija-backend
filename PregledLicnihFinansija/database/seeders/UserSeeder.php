@@ -22,6 +22,14 @@ class UserSeeder extends Seeder
                 ['name' => 'Administrator', 'password' => Hash::make($adminPassword), 'type' => 'administrator']
             );
             Administrator::firstOrCreate(['user_id' => $admin->id]);
+            Klijent::firstOrCreate(
+                ['user_id' => $admin->id],
+                [
+                    'net_worth' => 0,
+                    'premium_klijent' => true,
+                    'preferred_currency' => 'RSD',
+                ],
+            );
         } else {
             $this->command->warn('ADMIN_EMAIL / ADMIN_PASSWORD nisu postavljeni - admin nije kreiran.');
         }

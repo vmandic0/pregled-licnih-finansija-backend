@@ -20,6 +20,10 @@ class IsPremium
         /** @var User $user */
         $user = $request->user();
 
+        if ($user->isAdmin()) {
+            return $next($request);
+        }
+
         $klijent = Klijent::where('user_id', $user->id)->first();
 
         if (!$klijent || !$klijent->isPremium()) {
