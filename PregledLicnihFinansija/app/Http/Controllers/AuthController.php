@@ -83,7 +83,7 @@ class AuthController extends Controller
     public function zaboravljenaLozinka(Request $request)
     {
         $request->validate([
-            'email' => 'required|email|exists:users,email',
+            'email' => 'required|email',
         ]);
 
         \Illuminate\Auth\Notifications\ResetPassword::createUrlUsing(function ($user, string $token) {
@@ -93,15 +93,13 @@ class AuthController extends Controller
         return $frontendUrl . '/reset-lozinka?token=' . $token . '&email=' . urlencode($user->email);
         });
 
-        $status = \Illuminate\Support\Facades\Password::sendResetLink(
+        \Illuminate\Support\Facades\Password::sendResetLink(
             $request->only('email')
         );
 
-        if($status === \Illuminate\Support\Facades\Password::RESET_LINK_SENT){
-             return response()->json(['poruka' => 'Reset link je poslat na email.']);
-        }
-
-         return response()->json(['poruka' => 'Greška pri slanju reset linka.'], 400);
+        return response()->json([
+            'poruka' => 'Ako nalog sa tim emailom postoji, reset link je poslat.',
+        ]);
     }
 
     //Reset lozinke
