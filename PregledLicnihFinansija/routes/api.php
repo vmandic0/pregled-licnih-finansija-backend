@@ -21,6 +21,9 @@ use App\Http\Middleware\IsPremium;
 
 Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:register');
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
+Route::get('/csrf-token', function (Request $request) {
+    return response()->json(['token' => $request->session()->token()]);
+});
 
 //Zaboravljena lozinka
 Route::post('/zaboravljena-lozinka', [AuthController::class, 'zaboravljenaLozinka'])->middleware('throttle:password-reset');
