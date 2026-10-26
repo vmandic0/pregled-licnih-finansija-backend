@@ -5,8 +5,11 @@ namespace App\Providers;
 use App\Models\Transakcija;
 use App\Observers\TransakcijaObserver;
 use Carbon\CarbonImmutable;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -26,6 +29,26 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Transakcija::observe(TransakcijaObserver::class);
+        RateLimiter::for('login', function (Request $request): Limit {
+            return Limit::perMinute(5)->by(
+                strtolower((string) $request->input('email')).'|'.$request->ip()
+            );
+        });
+
+        RateLimiter::for('register', function (Request $request): Limit {
+            return Limit::perHour(10)->by($request->ip());
+        });
+
+        RateLimiter::for('password-reset', function (Request $request): Limit {
+            return Limit::perMinute(3)->by($request->ip());
+        });
+
+        RateLimiter::for('authenticated-api', function (Request $request): Limit {
+            return Limit::perMinute(60)->by(
+                (string) $request->user()->getAuthIdentifier()
+            );
+        });
+
         $this->configureDefaults();
   
     }

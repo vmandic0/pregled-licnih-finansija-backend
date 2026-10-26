@@ -119,6 +119,7 @@ class AuthController extends Controller
                 $user->forceFill([
                     'password' => Hash::make($password),
                 ])->save();
+                $user->tokens()->delete();
             }
         );
        
