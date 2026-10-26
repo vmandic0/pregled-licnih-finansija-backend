@@ -7,6 +7,7 @@ use App\Models\Klijent;
 use App\Models\Transakcija;
 use App\Models\Kategorija;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class AdminController extends Controller
 {
@@ -44,6 +45,22 @@ class AdminController extends Controller
 
     public function analitika()
     {
+        $driver = DB::connection()->getDriverName();
+        $dateParts = match ($driver) {
+            'pgsql' => [
+                'year' => 'EXTRACT(YEAR FROM datum)',
+                'month' => 'EXTRACT(MONTH FROM datum)',
+            ],
+            'sqlite' => [
+                'year' => "strftime('%Y', datum)",
+                'month' => "strftime('%m', datum)",
+            ],
+            default => [
+                'year' => 'YEAR(datum)',
+                'month' => 'MONTH(datum)',
+            ],
+        };
+
         $ukupnoKorisnika = User::count();
         $ukupnoPremium = Klijent::where('premium_klijent', true)->count();
         $ukupnoTransakcija = Transakcija::count();
@@ -53,7 +70,7 @@ class AdminController extends Controller
             ->groupBy('kategorija_id')
             ->get(); 
 
-        $transakcijePoMesecu = Transakcija::selectRaw('YEAR(datum) as godina, MONTH(datum) as mesec, count(*) as broj, sum(kolicina) as ukupno')
+        $transakcijePoMesecu = Transakcija::selectRaw("{$dateParts['year']} as godina, {$dateParts['month']} as mesec, count(*) as broj, sum(kolicina) as ukupno")
             ->groupBy('godina', 'mesec')
             ->orderBy('godina', 'desc')
             ->orderBy('mesec', 'desc')
