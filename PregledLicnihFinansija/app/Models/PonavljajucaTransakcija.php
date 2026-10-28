@@ -13,6 +13,7 @@ class PonavljajucaTransakcija extends Model
         'kategorija_id',
         'kolicina',
         'ucestalost',
+        'interval_vrednost',
         'sledeci_datum',
         'aktivna',
     ];
@@ -21,6 +22,7 @@ class PonavljajucaTransakcija extends Model
     {
         return [
             'kolicina' => 'double',
+            'interval_vrednost' => 'integer',
             'sledeci_datum' => 'date',
             'aktivna' => 'boolean',
         ];

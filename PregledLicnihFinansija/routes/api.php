@@ -13,6 +13,7 @@ use App\Http\Controllers\GrupnaTransakcijaController;
 use App\Http\Controllers\ProfilnaSlikaController;
 use App\Http\Controllers\AdminController;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Route;
 use App\Http\Middleware\IsAdmin;
 
@@ -74,11 +75,34 @@ Route::middleware(['auth:sanctum', 'throttle:authenticated-api'])->group(functio
         );
     });
 
+    Route::get('/obavestenja', function (Request $request) {
+        $klijent = Klijent::where('user_id', $request->user()->id)->first();
+
+        if (!$klijent) {
+            return response()->json(['message' => 'Korisnik nije klijent.'], 403);
+        }
+
+        $tomorrow = Carbon::tomorrow()->toDateString();
+        $reminders = PonavljajucaTransakcija::where('klijent_id', $klijent->id)
+            ->where('aktivna', true)
+            ->whereDate('sledeci_datum', $tomorrow)
+            ->with('kategorija')
+            ->get()
+            ->map(fn (PonavljajucaTransakcija $transaction) => [
+                'id' => $transaction->id,
+                'poruka' => "Sutra se izvršava ponavljajuća transakcija za kategoriju {$transaction->kategorija->naziv}, u iznosu {$transaction->kolicina} RSD.",
+                'datum' => $transaction->sledeci_datum->toDateString(),
+            ]);
+
+        return response()->json($reminders);
+    });
+
     Route::post('/ponavljajuce-transakcije', function (Request $request) {
         $validated = $request->validate([
             'kategorija_id' => ['required', 'exists:kategorije,id'],
             'kolicina' => ['required', 'numeric', 'gt:0'],
             'ucestalost' => ['required', Rule::in(['nedeljno', 'mesecno', 'godisnje'])],
+            'interval_vrednost' => ['required', 'integer', 'min:1', 'max:365'],
             'sledeci_datum' => ['required', 'date'],
         ]);
         $klijent = Klijent::where('user_id', $request->user()->id)->first();

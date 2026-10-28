@@ -28,7 +28,11 @@ class RecurringTransactionService
                             'datum' => $nextDate,
                         ]);
                         $created++;
-                        $nextDate = $this->nextDate($nextDate, $ponavljajuca->ucestalost);
+                        $nextDate = $this->nextDate(
+                            $nextDate,
+                            $ponavljajuca->ucestalost,
+                            (int) $ponavljajuca->interval_vrednost,
+                        );
                     }
 
                     $ponavljajuca->update(['sledeci_datum' => $nextDate]);
@@ -38,12 +42,12 @@ class RecurringTransactionService
         return $created;
     }
 
-    private function nextDate(CarbonImmutable $date, string $frequency): CarbonImmutable
+    private function nextDate(CarbonImmutable $date, string $frequency, int $interval): CarbonImmutable
     {
         return match ($frequency) {
-            'nedeljno' => $date->addWeek(),
-            'mesecno' => $date->addMonthNoOverflow(),
-            'godisnje' => $date->addYearNoOverflow(),
+            'nedeljno' => $date->addWeeks(max(1, $interval)),
+            'mesecno' => $date->addMonthsNoOverflow(max(1, $interval)),
+            'godisnje' => $date->addYearsNoOverflow(max(1, $interval)),
         };
     }
 }
