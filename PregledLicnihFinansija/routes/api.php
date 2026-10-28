@@ -18,6 +18,9 @@ use App\Http\Middleware\IsAdmin;
 
 
 use App\Http\Middleware\IsPremium;
+use App\Models\PonavljajucaTransakcija;
+use App\Models\Klijent;
+use Illuminate\Validation\Rule;
 
 Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:register');
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
@@ -54,6 +57,58 @@ Route::middleware(['auth:sanctum', 'throttle:authenticated-api'])->group(functio
     Route::post('/transakcije', [TransakcijaController::class, 'store']);
     Route::get('/transakcije/filter', [TransakcijaController::class, 'filter']);
     Route::delete('/transakcije/{id}', [TransakcijaController::class, 'destroy']);
+
+    Route::get('/ponavljajuce-transakcije', function (Request $request) {
+        $klijent = Klijent::where('user_id', $request->user()->id)->first();
+
+        if (!$klijent) {
+            return response()->json(['message' => 'Korisnik nije klijent.'], 403);
+        }
+
+        return response()->json(
+            PonavljajucaTransakcija::where('klijent_id', $klijent->id)
+                ->with('kategorija')
+                ->orderBy('aktivna', 'desc')
+                ->orderBy('sledeci_datum')
+                ->get()
+        );
+    });
+
+    Route::post('/ponavljajuce-transakcije', function (Request $request) {
+        $validated = $request->validate([
+            'kategorija_id' => ['required', 'exists:kategorije,id'],
+            'kolicina' => ['required', 'numeric', 'gt:0'],
+            'ucestalost' => ['required', Rule::in(['nedeljno', 'mesecno', 'godisnje'])],
+            'sledeci_datum' => ['required', 'date'],
+        ]);
+        $klijent = Klijent::where('user_id', $request->user()->id)->first();
+
+        if (!$klijent) {
+            return response()->json(['message' => 'Korisnik nije klijent.'], 403);
+        }
+
+        $ponavljajuca = PonavljajucaTransakcija::create([
+            ...$validated,
+            'klijent_id' => $klijent->id,
+        ]);
+
+        return response()->json($ponavljajuca->load('kategorija'), 201);
+    });
+
+    Route::delete('/ponavljajuce-transakcije/{id}', function (Request $request, int $id) {
+        $klijent = Klijent::where('user_id', $request->user()->id)->first();
+        $ponavljajuca = PonavljajucaTransakcija::where('id', $id)
+            ->where('klijent_id', $klijent?->id)
+            ->first();
+
+        if (!$ponavljajuca) {
+            return response()->json(['message' => 'Ponavljajuća transakcija nije pronađena.'], 404);
+        }
+
+        $ponavljajuca->delete();
+
+        return response()->json(['message' => 'Ponavljajuća transakcija je obrisana.']);
+    });
 
     Route::apiResource('limiti', LimitController::class)->except(['create', 'edit']);
 

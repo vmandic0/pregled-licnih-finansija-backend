@@ -7,6 +7,7 @@ use App\Models\Klijent;
 use App\Models\Limit;
 use App\Models\Transakcija;
 use App\Models\User;
+use App\Services\RecurringTransactionService;
 use Illuminate\Http\Request;
 
 class TransakcijaController extends Controller
@@ -83,8 +84,10 @@ class TransakcijaController extends Controller
     }
 
     // Use case 6 - Istorija aktivnosti
-    public function index(Request $request)
+    public function index(Request $request, RecurringTransactionService $recurringTransactions)
     {
+        $recurringTransactions->generateDue();
+
         /** @var User $user */
         $user = $request->user();
         $klijent = Klijent::where('user_id', $user->id)->first();
