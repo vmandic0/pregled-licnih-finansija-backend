@@ -15,6 +15,7 @@ class GrupnaTransakcija extends Model
         'naziv',
         'ciljIznos',
         'trenutnoPrikupljeno',
+        'rok',
     ];
 
     protected function casts(): array
@@ -22,6 +23,7 @@ class GrupnaTransakcija extends Model
         return [
             'ciljIznos' => 'double',
             'trenutnoPrikupljeno' => 'double',
+            'rok' => 'date:Y-m-d',
         ];
     }
 

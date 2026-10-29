@@ -19,6 +19,7 @@ class GrupnaTransakcijaController extends Controller
         $request->validate([
             'naziv' => 'required|string|max:255',
             'ciljIznos' => 'required|numeric|min:0',
+            'rok' => 'nullable|date|after_or_equal:today',
             'clanovi' => 'array',
             'clanovi.*' => 'exists:klijenti,id',
         ]);
@@ -49,6 +50,7 @@ class GrupnaTransakcijaController extends Controller
             'naziv' => $request->naziv,
             'ciljIznos' => $request->ciljIznos,
             'trenutnoPrikupljeno' => 0,
+            'rok' => $request->rok,
         ]);
 
         UdeoUGrupnojTransakciji::create([
@@ -205,6 +207,7 @@ class GrupnaTransakcijaController extends Controller
             ->get()
             ->map(function($grupa) {
                 $grupa->procenat_prikupljeno = $grupa->proveriStanje();
+                $grupa->je_kreator = $grupa->kreator_id === request()->user()->klijent?->id;
                 return $grupa;
             });
 
