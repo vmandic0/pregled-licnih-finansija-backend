@@ -39,10 +39,12 @@ class AuthController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
         $user->load('klijent');
+        $token = $user->createToken('fintrack-web')->plainTextToken;
         //Vraća se json sa porukom o uspešnoj registraciji
         return response()->json([
             'message' => 'Uspešna registracija!',
             'user' => $user,
+            'token' => $token,
         ], 201);
     }
 
@@ -68,10 +70,12 @@ class AuthController extends Controller
                     );
                 }
                 $user->load('klijent');
+                $token = $user->createToken('fintrack-web')->plainTextToken;
 
                 return response()->json([
                     'message' => 'Uspešna prijava!',
                     'user' => $user,
+                    'token' => $token,
                 ]);
             }
 
@@ -83,6 +87,7 @@ class AuthController extends Controller
     //Odjava
    public function logout(Request $request)
     {
+        $request->user()?->currentAccessToken()?->delete();
         Auth::guard('web')->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
