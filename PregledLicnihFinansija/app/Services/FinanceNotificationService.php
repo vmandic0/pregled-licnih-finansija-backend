@@ -121,9 +121,14 @@ class FinanceNotificationService
         string $message,
         array $details,
     ): void {
-        $exists = $user->notifications()
-            ->where('data->event_key', $eventKey)
-            ->exists();
+        $notifications = $user->notifications()->get(['data']);
+        $exists = $notifications->contains(function ($notification) use ($eventKey): bool {
+            $data = is_array($notification->data)
+                ? $notification->data
+                : json_decode((string) $notification->data, true);
+
+            return is_array($data) && ($data['event_key'] ?? null) === $eventKey;
+        });
 
         if (!$exists) {
             $user->notify(new FinanceNotification($eventKey, $title, $message, $details));

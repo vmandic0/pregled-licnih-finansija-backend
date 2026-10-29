@@ -99,6 +99,11 @@ Route::middleware(['auth:sanctum', 'throttle:authenticated-api'])->group(functio
         return response()->json(['message' => 'Obaveštenje je označeno kao pročitano.']);
     });
 
+    // Pozivi su dostupni svakom prijavljenom klijentu; kontroler ograničava
+    // rezultate i odgovor na pozive koji pripadaju trenutnom korisniku.
+    Route::get('/grupni-pozivi', [GrupnaTransakcijaController::class, 'pozivi']);
+    Route::post('/grupni-pozivi/{id}/{odgovor}', [GrupnaTransakcijaController::class, 'odgovorNaPoziv']);
+
     Route::post('/ponavljajuce-transakcije', function (Request $request) {
         $validated = $request->validate([
             'kategorija_id' => ['required', 'exists:kategorije,id'],
@@ -154,8 +159,6 @@ Route::middleware(['auth:sanctum', 'throttle:authenticated-api'])->group(functio
         Route::get('/grupe', [GrupnaTransakcijaController::class, 'index']);
         Route::post('/grupe', [GrupnaTransakcijaController::class, 'store']);
         Route::get('/grupe/dostupni-korisnici', [GrupnaTransakcijaController::class, 'dostupniKorisnici']);
-        Route::get('/grupni-pozivi', [GrupnaTransakcijaController::class, 'pozivi']);
-        Route::post('/grupni-pozivi/{id}/{odgovor}', [GrupnaTransakcijaController::class, 'odgovorNaPoziv']);
         Route::get('/grupe/{id}', [GrupnaTransakcijaController::class, 'show']);
         Route::post('/grupe/{id}/uplati', [GrupnaTransakcijaController::class, 'uplatiUdeo']);
         Route::post('/grupe/{id}/dodaj-clana', [GrupnaTransakcijaController::class, 'dodajClana']);
