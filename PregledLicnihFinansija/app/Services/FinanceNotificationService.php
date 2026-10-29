@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Klijent;
+use App\Models\GrupnaTransakcijaPoziv;
 use App\Models\Limit;
 use App\Models\PonavljajucaTransakcija;
 use App\Models\Transakcija;
@@ -27,6 +28,34 @@ class FinanceNotificationService
         $user = $klijent->user;
         $this->createRecurringReminders($user, $klijent);
         $this->createLimitReminders($user, $klijent);
+        $this->createGroupInvitationNotifications($user, $klijent);
+    }
+
+    private function createGroupInvitationNotifications(User $user, Klijent $klijent): void
+    {
+        GrupnaTransakcijaPoziv::where('pozvani_id', $klijent->id)
+            ->where('status', 'na_cekanju')
+            ->where(function ($query): void {
+                $query->whereNull('istice_at')->orWhere('istice_at', '>', now());
+            })
+            ->with(['grupa', 'pozivalac.user'])
+            ->get()
+            ->each(function (GrupnaTransakcijaPoziv $poziv) use ($user): void {
+                $this->sendOnce(
+                    $user,
+                    "group-invitation:{$poziv->id}",
+                    'Poziv za grupnu štednju',
+                    "{$poziv->pozivalac->user->name} vas je pozvao u grupu „{$poziv->grupa->naziv}“.",
+                    [
+                        'type' => 'group_invitation',
+                        'invitation_id' => $poziv->id,
+                        'group_id' => $poziv->grupna_transakcija_id,
+                        'group_name' => $poziv->grupa->naziv,
+                        'inviter_name' => $poziv->pozivalac->user->name,
+                        'actions' => true,
+                    ],
+                );
+            });
     }
 
     private function createRecurringReminders(User $user, Klijent $klijent): void

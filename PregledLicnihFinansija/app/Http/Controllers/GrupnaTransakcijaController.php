@@ -138,20 +138,29 @@ class GrupnaTransakcijaController extends Controller
                 ],
             );
 
-            app(FinanceNotificationService::class)->sendUnique(
-                $pozvani->user,
-                "group-invitation:{$poziv->id}",
-                'Poziv za grupnu štednju',
-                "{$pozivalac->user->name} vas je pozvao u grupu „{$grupa->naziv}“.",
-                [
-                    'type' => 'group_invitation',
+            try {
+                app(FinanceNotificationService::class)->sendUnique(
+                    $pozvani->user,
+                    "group-invitation:{$poziv->id}",
+                    'Poziv za grupnu štednju',
+                    "{$pozivalac->user->name} vas je pozvao u grupu „{$grupa->naziv}“.",
+                    [
+                        'type' => 'group_invitation',
+                        'invitation_id' => $poziv->id,
+                        'group_id' => $grupa->id,
+                        'group_name' => $grupa->naziv,
+                        'inviter_name' => $pozivalac->user->name,
+                        'actions' => true,
+                    ],
+                );
+            } catch (Throwable $exception) {
+                Log::error('Slanje poziva za grupnu transakciju nije uspelo.', [
                     'invitation_id' => $poziv->id,
-                    'group_id' => $grupa->id,
-                    'group_name' => $grupa->naziv,
-                    'inviter_name' => $pozivalac->user->name,
-                    'actions' => true,
-                ],
-            );
+                    'recipient_user_id' => $pozvani->user_id,
+                    'exception' => $exception,
+                ]);
+                error_log('Slanje poziva za grupnu transakciju nije uspelo: '.$exception->getMessage());
+            }
         }
     }
 
