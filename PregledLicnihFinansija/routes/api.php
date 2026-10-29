@@ -13,7 +13,7 @@ use App\Http\Controllers\GrupnaTransakcijaController;
 use App\Http\Controllers\ProfilnaSlikaController;
 use App\Http\Controllers\AdminController;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
+use App\Services\FinanceNotificationService;
 use Illuminate\Support\Facades\Route;
 use App\Http\Middleware\IsAdmin;
 
@@ -75,26 +75,28 @@ Route::middleware(['auth:sanctum', 'throttle:authenticated-api'])->group(functio
         );
     });
 
-    Route::get('/obavestenja', function (Request $request) {
+    Route::get('/obavestenja', function (Request $request, FinanceNotificationService $notificationService) {
         $klijent = Klijent::where('user_id', $request->user()->id)->first();
 
         if (!$klijent) {
             return response()->json(['message' => 'Korisnik nije klijent.'], 403);
         }
 
-        $tomorrow = Carbon::tomorrow()->toDateString();
-        $reminders = PonavljajucaTransakcija::where('klijent_id', $klijent->id)
-            ->where('aktivna', true)
-            ->whereDate('sledeci_datum', $tomorrow)
-            ->with('kategorija')
-            ->get()
-            ->map(fn (PonavljajucaTransakcija $transaction) => [
-                'id' => $transaction->id,
-                'poruka' => "Sutra se izvršava ponavljajuća transakcija za kategoriju {$transaction->kategorija->naziv}, u iznosu {$transaction->kolicina} RSD.",
-                'datum' => $transaction->sledeci_datum->toDateString(),
-            ]);
+        $notificationService->createPending($klijent);
 
-        return response()->json($reminders);
+        return response()->json($request->user()->notifications()->latest()->get());
+    });
+
+    Route::post('/obavestenja/{id}/procitano', function (Request $request, string $id) {
+        $notification = $request->user()->notifications()->whereKey($id)->first();
+
+        if (!$notification) {
+            return response()->json(['message' => 'Obaveštenje nije pronađeno.'], 404);
+        }
+
+        $notification->markAsRead();
+
+        return response()->json(['message' => 'Obaveštenje je označeno kao pročitano.']);
     });
 
     Route::post('/ponavljajuce-transakcije', function (Request $request) {
