@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\GrupnaTransakcija;
+use App\Models\GrupnaTransakcijaPoziv;
 use App\Models\Klijent;
 use App\Models\UdeoUGrupnojTransakciji;
 use App\Models\User;
+use App\Services\FinanceNotificationService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class GrupnaTransakcijaController extends Controller
@@ -28,7 +31,7 @@ class GrupnaTransakcijaController extends Controller
             return response()->json(['message' => 'Korisnik nije klijent.'], 403);
         }
 
-        // Proveri da li su svi clanovi premium
+        // Proveri da li su svi pozvani clanovi premium.
         if ($request->has('clanovi')) {
             $nijePremium = Klijent::whereIn('id', $request->clanovi)
                 ->where('premium_klijent', false)
@@ -48,25 +51,141 @@ class GrupnaTransakcijaController extends Controller
             'trenutnoPrikupljeno' => 0,
         ]);
 
-        // Dodaj kreatora kao clana automatski
-        $clanovi = $request->clanovi ?? [];
-        if (!in_array($klijent->id, $clanovi)) {
-            $clanovi[] = $klijent->id;
-        }
+        UdeoUGrupnojTransakciji::create([
+            'grupna_transakcija_id' => $grupnaTransakcija->id,
+            'klijent_id' => $klijent->id,
+            'iznosUdela' => 0,
+            'datumUplate' => now(),
+        ]);
 
-        foreach ($clanovi as $clanId) {
-            UdeoUGrupnojTransakciji::create([
-                'grupna_transakcija_id' => $grupnaTransakcija->id,
-                'klijent_id' => $clanId,
-                'iznosUdela' => 0,
-                'datumUplate' => now(),
-            ]);
-        }
+        $this->createInvitations($grupnaTransakcija, $klijent, $request->clanovi ?? []);
 
         return response()->json([
             'message' => 'Grupa uspešno kreirana!',
             'grupa' => $grupnaTransakcija->load('udeli.klijent.user'),
         ], 201);
+    }
+
+    public function dostupniKorisnici(Request $request)
+    {
+        $klijent = Klijent::where('user_id', $request->user()->id)->firstOrFail();
+        $grupaId = $request->integer('grupa_id');
+        $search = trim((string) $request->input('pretraga', ''));
+
+        $alreadyInGroup = $grupaId
+            ? UdeoUGrupnojTransakciji::where('grupna_transakcija_id', $grupaId)->pluck('klijent_id')
+            : collect();
+
+        $users = Klijent::query()
+            ->with('user:id,name,email')
+            ->where('id', '!=', $klijent->id)
+            ->where('premium_klijent', true)
+            ->when($alreadyInGroup->isNotEmpty(), fn ($query) => $query->whereNotIn('id', $alreadyInGroup))
+            ->when($search !== '', fn ($query) => $query->whereHas('user', fn ($userQuery) => $userQuery
+                ->where('name', 'like', "%{$search}%")
+                ->orWhere('email', 'like', "%{$search}%")))
+            ->limit(20)
+            ->get()
+            ->map(fn (Klijent $candidate) => [
+                'id' => $candidate->id,
+                'name' => $candidate->user->name,
+                'email' => $candidate->user->email,
+            ]);
+
+        return response()->json($users);
+    }
+
+    private function createInvitations(GrupnaTransakcija $grupa, Klijent $pozivalac, array $clanovi): void
+    {
+        $clanovi = array_values(array_unique(array_filter($clanovi, fn ($id) => (int) $id !== $pozivalac->id)));
+
+        foreach ($clanovi as $clanId) {
+            $pozvani = Klijent::with('user')->find($clanId);
+            if (!$pozvani || !$pozvani->isPremium()) {
+                continue;
+            }
+
+            $poziv = GrupnaTransakcijaPoziv::firstOrCreate(
+                [
+                    'grupna_transakcija_id' => $grupa->id,
+                    'pozvani_id' => $pozvani->id,
+                    'status' => 'na_cekanju',
+                ],
+                [
+                    'pozivalac_id' => $pozivalac->id,
+                    'istice_at' => Carbon::now()->addDays(7),
+                ],
+            );
+
+            app(FinanceNotificationService::class)->sendUnique(
+                $pozvani->user,
+                "group-invitation:{$poziv->id}",
+                'Poziv za grupnu štednju',
+                "{$pozivalac->user->name} vas je pozvao u grupu „{$grupa->naziv}“.",
+                [
+                    'type' => 'group_invitation',
+                    'invitation_id' => $poziv->id,
+                    'group_id' => $grupa->id,
+                    'group_name' => $grupa->naziv,
+                    'inviter_name' => $pozivalac->user->name,
+                    'actions' => true,
+                ],
+            );
+        }
+    }
+
+    public function odgovorNaPoziv(Request $request, int $id, string $odgovor)
+    {
+        if (!in_array($odgovor, ['prihvati', 'odbij'], true)) {
+            return response()->json(['message' => 'Nevažeći odgovor.'], 422);
+        }
+
+        $klijent = Klijent::where('user_id', $request->user()->id)->firstOrFail();
+        $poziv = GrupnaTransakcijaPoziv::with(['grupa', 'pozivalac.user'])
+            ->where('id', $id)
+            ->where('pozvani_id', $klijent->id)
+            ->where('status', 'na_cekanju')
+            ->first();
+
+        if (!$poziv) {
+            return response()->json(['message' => 'Poziv nije pronađen ili je već obrađen.'], 404);
+        }
+
+        if ($poziv->istice_at?->isPast()) {
+            $poziv->update(['status' => 'istekao', 'odgovoreno_at' => now()]);
+            return response()->json(['message' => 'Poziv je istekao.'], 422);
+        }
+
+        $accepted = $odgovor === 'prihvati';
+        $poziv->update([
+            'status' => $accepted ? 'prihvacen' : 'odbijen',
+            'odgovoreno_at' => now(),
+        ]);
+
+        if ($accepted) {
+            UdeoUGrupnojTransakciji::firstOrCreate(
+                ['grupna_transakcija_id' => $poziv->grupna_transakcija_id, 'klijent_id' => $klijent->id],
+                ['iznosUdela' => 0, 'datumUplate' => now()],
+            );
+        }
+
+        $statusText = $accepted ? 'prihvatio' : 'odbio';
+        app(FinanceNotificationService::class)->sendUnique(
+            $poziv->pozivalac->user,
+            "group-invitation-response:{$poziv->id}:{$poziv->status}",
+            'Odgovor na poziv za grupu',
+            "{$klijent->user->name} je {$statusText} poziv za grupu „{$poziv->grupa->naziv}“.",
+            [
+                'type' => 'group_invitation_response',
+                'invitation_id' => $poziv->id,
+                'group_id' => $poziv->grupna_transakcija_id,
+                'group_name' => $poziv->grupa->naziv,
+                'member_name' => $klijent->user->name,
+                'status' => $poziv->status,
+            ],
+        );
+
+        return response()->json(['message' => $accepted ? 'Poziv prihvaćen.' : 'Poziv odbijen.']);
     }
 
     // Pregled svih grupa u kojima klijent učestvuje ili je kreator
@@ -82,7 +201,7 @@ class GrupnaTransakcijaController extends Controller
 
         $grupe = GrupnaTransakcija::where('kreator_id', $klijent->id)
             ->orWhereHas('udeli', fn($q) => $q->where('klijent_id', $klijent->id))
-            ->with('udeli.klijent.user')
+            ->with(['udeli.klijent.user', 'pozivi.pozvani.user'])
             ->get()
             ->map(function($grupa) {
                 $grupa->procenat_prikupljeno = $grupa->proveriStanje();
@@ -103,7 +222,7 @@ class GrupnaTransakcijaController extends Controller
             return response()->json(['message' => 'Korisnik nije klijent.'], 403);
         }
 
-        $grupa = GrupnaTransakcija::with('udeli.klijent.user')->findOrFail($id);
+        $grupa = GrupnaTransakcija::with(['udeli.klijent.user', 'pozivi.pozvani.user'])->findOrFail($id);
 
         // Proveri da li je korisnik kreator ili clan grupe
         $jeKreator = $grupa->kreator_id === $klijent->id;
@@ -200,15 +319,10 @@ class GrupnaTransakcijaController extends Controller
             return response()->json(['message' => 'Korisnik je vec clan grupe.'], 400);
         }
 
-        UdeoUGrupnojTransakciji::create([
-            'grupna_transakcija_id' => $grupa->id,
-            'klijent_id' => $request->klijent_id,
-            'iznosUdela' => 0,
-            'datumUplate' => now(),
-        ]);
+        $this->createInvitations($grupa, $klijent, [$request->klijent_id]);
 
         return response()->json([
-            'message' => 'Clan uspešno dodat!',
+            'message' => 'Poziv za člana je poslat!',
             'grupa' => $grupa->load('udeli.klijent.user'),
         ]);
     }

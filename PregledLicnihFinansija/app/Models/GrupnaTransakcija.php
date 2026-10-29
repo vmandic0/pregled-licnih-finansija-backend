@@ -35,6 +35,11 @@ class GrupnaTransakcija extends Model
         return $this->hasMany(UdeoUGrupnojTransakciji::class);
     }
 
+    public function pozivi()
+    {
+        return $this->hasMany(GrupnaTransakcijaPoziv::class, 'grupna_transakcija_id');
+    }
+
     // Use case 10 - proverava stanje prikupljanja
     public function proveriStanje(): float
     {

@@ -12,6 +12,16 @@ use Carbon\CarbonImmutable;
 
 class FinanceNotificationService
 {
+    public function sendUnique(
+        User $user,
+        string $eventKey,
+        string $title,
+        string $message,
+        array $details,
+    ): void {
+        $this->sendOnce($user, $eventKey, $title, $message, $details);
+    }
+
     public function createPending(Klijent $klijent): void
     {
         $user = $klijent->user;
