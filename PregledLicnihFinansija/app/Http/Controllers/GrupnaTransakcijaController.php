@@ -10,6 +10,9 @@ use App\Models\User;
 use App\Services\FinanceNotificationService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class GrupnaTransakcijaController extends Controller
 {
@@ -45,22 +48,38 @@ class GrupnaTransakcijaController extends Controller
             }
         }
 
-        $grupnaTransakcija = GrupnaTransakcija::create([
-            'kreator_id' => $klijent->id,
-            'naziv' => $request->naziv,
-            'ciljIznos' => $request->ciljIznos,
-            'trenutnoPrikupljeno' => 0,
-            'rok' => $request->rok,
-        ]);
+        try {
+            $grupnaTransakcija = DB::transaction(function () use ($request, $klijent) {
+                $grupa = GrupnaTransakcija::create([
+                    'kreator_id' => $klijent->id,
+                    'naziv' => $request->naziv,
+                    'ciljIznos' => $request->ciljIznos,
+                    'trenutnoPrikupljeno' => 0,
+                    'rok' => $request->rok,
+                ]);
 
-        UdeoUGrupnojTransakciji::create([
-            'grupna_transakcija_id' => $grupnaTransakcija->id,
-            'klijent_id' => $klijent->id,
-            'iznosUdela' => 0,
-            'datumUplate' => now(),
-        ]);
+                UdeoUGrupnojTransakciji::create([
+                    'grupna_transakcija_id' => $grupa->id,
+                    'klijent_id' => $klijent->id,
+                    'iznosUdela' => 0,
+                    'datumUplate' => now(),
+                ]);
 
-        $this->createInvitations($grupnaTransakcija, $klijent, $request->clanovi ?? []);
+                $this->createInvitations($grupa, $klijent, $request->clanovi ?? []);
+
+                return $grupa;
+            });
+        } catch (Throwable $exception) {
+            Log::error('Kreiranje grupne transakcije nije uspelo.', [
+                'user_id' => $user->id,
+                'clanovi' => $request->clanovi ?? [],
+                'exception' => $exception,
+            ]);
+
+            return response()->json([
+                'message' => 'Grupa nije kreirana jer poziv nije mogao biti poslat.',
+            ], 500);
+        }
 
         return response()->json([
             'message' => 'Grupa uspešno kreirana!',

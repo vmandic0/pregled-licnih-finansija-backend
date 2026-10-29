@@ -1,4 +1,5 @@
 #!/bin/bash
+set -Eeuo pipefail
 
 #Pozicioniraj se u folder aplikacije na samom početku
 cd /var/www/html/PregledLicnihFinansija
@@ -22,7 +23,9 @@ php artisan cache:clear
 
 #Kreira/ažurira tabele u bazi
 echo "Pokrećem migracije baze podataka (ako ima novih)..."
-php artisan migrate --force
+php artisan migrate --force --no-interaction
+echo "Status migracija:"
+php artisan migrate:status --no-interaction
 
 #Seed je idempotentan (firstOrCreate), pa je bezbedno da ide na svakom startu.
 #Mora ovde jer Render free plan nema Shell.
