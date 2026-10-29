@@ -65,8 +65,6 @@ class GrupnaTransakcijaController extends Controller
                     'datumUplate' => now(),
                 ]);
 
-                $this->createInvitations($grupa, $klijent, $request->clanovi ?? []);
-
                 return $grupa;
             });
         } catch (Throwable $exception) {
@@ -75,6 +73,8 @@ class GrupnaTransakcijaController extends Controller
                 'clanovi' => $request->clanovi ?? [],
                 'exception' => $exception,
             ]);
+
+            $this->createInvitations($grupnaTransakcija, $klijent, $request->clanovi ?? []);
 
             return response()->json([
                 'message' => 'Grupa nije kreirana jer poziv nije mogao biti poslat.',
@@ -126,17 +126,26 @@ class GrupnaTransakcijaController extends Controller
                 continue;
             }
 
-            $poziv = GrupnaTransakcijaPoziv::firstOrCreate(
-                [
-                    'grupna_transakcija_id' => $grupa->id,
-                    'pozvani_id' => $pozvani->id,
-                    'status' => 'na_cekanju',
-                ],
-                [
-                    'pozivalac_id' => $pozivalac->id,
-                    'istice_at' => Carbon::now()->addDays(7),
-                ],
-            );
+            try {
+                $poziv = GrupnaTransakcijaPoziv::firstOrCreate(
+                    [
+                        'grupna_transakcija_id' => $grupa->id,
+                        'pozvani_id' => $pozvani->id,
+                        'status' => 'na_cekanju',
+                    ],
+                    [
+                        'pozivalac_id' => $pozivalac->id,
+                        'istice_at' => Carbon::now()->addDays(7),
+                    ],
+                );
+            } catch (Throwable $exception) {
+                Log::error('Kreiranje poziva za grupnu transakciju nije uspelo.', [
+                    'group_id' => $grupa->id,
+                    'recipient_client_id' => $pozvani->id,
+                    'exception' => $exception,
+                ]);
+                continue;
+            }
 
             try {
                 app(FinanceNotificationService::class)->sendUnique(
