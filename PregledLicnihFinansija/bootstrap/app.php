@@ -18,6 +18,10 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
+        $middleware->validateCsrfTokens(except: [
+            'api/login',
+            'api/register',
+        ]);
         $middleware->statefulApi();
         $middleware->api(replace: [
             SanctumEnsureFrontendRequestsAreStateful::class => EnsureFrontendRequestsAreStateful::class,
