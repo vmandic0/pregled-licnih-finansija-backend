@@ -48,8 +48,15 @@ class GrupnaTransakcijaController extends Controller
             }
         }
 
+        $clanovi = collect($request->input('clanovi', []))
+            ->map(static fn ($id): int => (int) $id)
+            ->unique()
+            ->reject(fn (int $id): bool => $id === $klijent->id)
+            ->values()
+            ->all();
+
         try {
-            $grupnaTransakcija = DB::transaction(function () use ($request, $klijent) {
+            [$grupnaTransakcija, $pozivi] = DB::transaction(function () use ($request, $klijent, $clanovi) {
                 $grupa = GrupnaTransakcija::create([
                     'kreator_id' => $klijent->id,
                     'naziv' => $request->naziv,
@@ -65,25 +72,28 @@ class GrupnaTransakcijaController extends Controller
                     'datumUplate' => now(),
                 ]);
 
-                return $grupa;
+                $pozivi = $this->createInvitations($grupa, $klijent, $clanovi);
+
+                return [$grupa, $pozivi];
             });
         } catch (Throwable $exception) {
             Log::error('Kreiranje grupne transakcije nije uspelo.', [
                 'user_id' => $user->id,
-                'clanovi' => $request->clanovi ?? [],
+                'clanovi' => $clanovi,
                 'exception' => $exception,
             ]);
 
-            $this->createInvitations($grupnaTransakcija, $klijent, $request->clanovi ?? []);
-
             return response()->json([
-                'message' => 'Grupa nije kreirana jer poziv nije mogao biti poslat.',
+                'message' => 'Grupa nije kreirana jer poziv nije mogao biti upisan.',
             ], 500);
         }
 
+        $this->sendInvitationNotifications($pozivi, $klijent, $grupnaTransakcija);
+
         return response()->json([
             'message' => 'Grupa uspešno kreirana!',
-            'grupa' => $grupnaTransakcija->load('udeli.klijent.user'),
+            'grupa' => $grupnaTransakcija->load(['udeli.klijent.user', 'pozivi.pozvani.user']),
+            'poslato_poziva' => count($pozivi),
         ], 201);
     }
 
@@ -139,38 +149,42 @@ class GrupnaTransakcijaController extends Controller
         );
     }
 
-    private function createInvitations(GrupnaTransakcija $grupa, Klijent $pozivalac, array $clanovi): void
+    private function createInvitations(GrupnaTransakcija $grupa, Klijent $pozivalac, array $clanovi): array
     {
-        $clanovi = array_values(array_unique(array_filter($clanovi, fn ($id) => (int) $id !== $pozivalac->id)));
+        $pozivi = [];
 
         foreach ($clanovi as $clanId) {
             $pozvani = Klijent::with('user')->find($clanId);
             if (!$pozvani || !$pozvani->isPremium()) {
-                continue;
-            }
-
-            try {
-                $poziv = GrupnaTransakcijaPoziv::firstOrCreate(
-                    [
-                        'grupna_transakcija_id' => $grupa->id,
-                        'pozvani_id' => $pozvani->id,
-                        'status' => 'na_cekanju',
-                    ],
-                    [
-                        'pozivalac_id' => $pozivalac->id,
-                        'istice_at' => Carbon::now()->addDays(7),
-                    ],
-                );
-            } catch (Throwable $exception) {
-                Log::error('Kreiranje poziva za grupnu transakciju nije uspelo.', [
+                Log::warning('Poziv za grupnu transakciju je preskočen.', [
                     'group_id' => $grupa->id,
-                    'recipient_client_id' => $pozvani->id,
-                    'exception' => $exception,
+                    'recipient_client_id' => $clanId,
+                    'reason' => !$pozvani ? 'client_not_found' : 'client_not_premium',
                 ]);
                 continue;
             }
 
+            $pozivi[] = GrupnaTransakcijaPoziv::firstOrCreate(
+                [
+                    'grupna_transakcija_id' => $grupa->id,
+                    'pozvani_id' => $pozvani->id,
+                ],
+                [
+                    'pozivalac_id' => $pozivalac->id,
+                    'status' => 'na_cekanju',
+                    'istice_at' => Carbon::now()->addDays(7),
+                ],
+            );
+        }
+
+        return $pozivi;
+    }
+
+    private function sendInvitationNotifications(array $pozivi, Klijent $pozivalac, GrupnaTransakcija $grupa): void
+    {
+        foreach ($pozivi as $poziv) {
             try {
+                $pozvani = $poziv->pozvani()->with('user')->firstOrFail();
                 app(FinanceNotificationService::class)->sendUnique(
                     $pozvani->user,
                     "group-invitation:{$poziv->id}",
@@ -188,7 +202,7 @@ class GrupnaTransakcijaController extends Controller
             } catch (Throwable $exception) {
                 Log::error('Slanje poziva za grupnu transakciju nije uspelo.', [
                     'invitation_id' => $poziv->id,
-                    'recipient_user_id' => $pozvani->user_id,
+                    'recipient_client_id' => $poziv->pozvani_id,
                     'exception' => $exception,
                 ]);
                 error_log('Slanje poziva za grupnu transakciju nije uspelo: '.$exception->getMessage());
