@@ -116,6 +116,29 @@ class GrupnaTransakcijaController extends Controller
         return response()->json($users);
     }
 
+    public function pozivi(Request $request)
+    {
+        $klijent = Klijent::where('user_id', $request->user()->id)->firstOrFail();
+
+        return response()->json(
+            GrupnaTransakcijaPoziv::where('pozvani_id', $klijent->id)
+                ->where('status', 'na_cekanju')
+                ->where(function ($query): void {
+                    $query->whereNull('istice_at')->orWhere('istice_at', '>', now());
+                })
+                ->with(['grupa', 'pozivalac.user'])
+                ->latest()
+                ->get()
+                ->map(fn (GrupnaTransakcijaPoziv $poziv) => [
+                    'id' => $poziv->id,
+                    'grupa_id' => $poziv->grupna_transakcija_id,
+                    'grupa_naziv' => $poziv->grupa->naziv,
+                    'pozivalac' => $poziv->pozivalac->user->name,
+                    'istice_at' => $poziv->istice_at,
+                ]),
+        );
+    }
+
     private function createInvitations(GrupnaTransakcija $grupa, Klijent $pozivalac, array $clanovi): void
     {
         $clanovi = array_values(array_unique(array_filter($clanovi, fn ($id) => (int) $id !== $pozivalac->id)));

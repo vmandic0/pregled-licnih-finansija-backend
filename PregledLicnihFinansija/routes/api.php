@@ -154,6 +154,7 @@ Route::middleware(['auth:sanctum', 'throttle:authenticated-api'])->group(functio
         Route::get('/grupe', [GrupnaTransakcijaController::class, 'index']);
         Route::post('/grupe', [GrupnaTransakcijaController::class, 'store']);
         Route::get('/grupe/dostupni-korisnici', [GrupnaTransakcijaController::class, 'dostupniKorisnici']);
+        Route::get('/grupni-pozivi', [GrupnaTransakcijaController::class, 'pozivi']);
         Route::post('/grupni-pozivi/{id}/{odgovor}', [GrupnaTransakcijaController::class, 'odgovorNaPoziv']);
         Route::get('/grupe/{id}', [GrupnaTransakcijaController::class, 'show']);
         Route::post('/grupe/{id}/uplati', [GrupnaTransakcijaController::class, 'uplatiUdeo']);
