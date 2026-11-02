@@ -19,6 +19,10 @@ class AuthController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
+            'age_confirmed' => 'required|accepted',
+        ], [
+            'age_confirmed.required' => 'Morate potvrditi da imate najmanje 16 godina.',
+            'age_confirmed.accepted' => 'Morate potvrditi da imate najmanje 16 godina.',
         ]);
 
         //Pravljenje objekta user koji je po defaultu klijent
@@ -27,6 +31,7 @@ class AuthController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'type' => 'klijent',
+            'age_confirmed_at' => now(),
         ]);
         
         Klijent::create([
