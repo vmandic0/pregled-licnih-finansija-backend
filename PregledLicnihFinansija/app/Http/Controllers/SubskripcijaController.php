@@ -50,8 +50,10 @@ class SubskripcijaController extends Controller
             'iznos' => ['required', 'numeric', 'decimal:0,2', 'gt:0'],
             'valuta' => ['required', 'string', 'size:3'],
             'datum_naplate' => ['required', 'date'],
+            'ucestalost' => ['required', 'in:mesecno,godisnje'],
             'kategorija_id' => ['required', 'exists:kategorije,id'],
             'aktivna' => ['sometimes', 'boolean'],
+            'request_id' => ['sometimes', 'nullable', 'string', 'max:64'],
         ]);
 
         $klijent = $this->klijent($request);
@@ -65,14 +67,22 @@ class SubskripcijaController extends Controller
         }
 
         $sledeci = CarbonImmutable::parse($validated['datum_naplate']);
-        if ($sledeci->lessThan(CarbonImmutable::today())) {
-            $sledeci = $sledeci->setDay(min((int) $sledeci->day, 28));
-            while ($sledeci->lessThan(CarbonImmutable::today())) {
-                $sledeci = $sledeci->addMonthNoOverflow();
-            }
+        while ($sledeci->lessThan(CarbonImmutable::today())) {
+            $sledeci = $validated['ucestalost'] === 'godisnje'
+                ? $sledeci->addYearsNoOverflow()
+                : $sledeci->addMonthNoOverflow();
         }
         $dan = (int) $sledeci->day;
         unset($validated['datum_naplate']);
+
+        if (!empty($validated['request_id'])) {
+            $existing = Subskripcija::where('klijent_id', $klijent->id)
+                ->where('request_id', $validated['request_id'])
+                ->first();
+            if ($existing) {
+                return response()->json($existing->load('kategorija'), 200);
+            }
+        }
 
         $subskripcija = Subskripcija::create([
             ...$validated,
@@ -96,6 +106,7 @@ class SubskripcijaController extends Controller
             'iznos' => ['sometimes', 'required', 'numeric', 'decimal:0,2', 'gt:0'],
             'valuta' => ['sometimes', 'required', 'string', 'size:3'],
             'datum_naplate' => ['sometimes', 'required', 'date'],
+            'ucestalost' => ['sometimes', 'required', 'in:mesecno,godisnje'],
             'kategorija_id' => ['sometimes', 'required', 'exists:kategorije,id'],
             'aktivna' => ['sometimes', 'boolean'],
         ]);
@@ -116,9 +127,11 @@ class SubskripcijaController extends Controller
         if (isset($validated['datum_naplate'])) {
             $sledeci = CarbonImmutable::parse($validated['datum_naplate']);
             $dan = (int) $sledeci->day;
-            $sledeci = $subskripcija->sledeci_datum->day($dan);
-            if ($sledeci->lessThan(CarbonImmutable::today())) {
-                $sledeci = $sledeci->addMonthNoOverflow();
+            $ucestalost = $validated['ucestalost'] ?? $subskripcija->ucestalost;
+            while ($sledeci->lessThan(CarbonImmutable::today())) {
+                $sledeci = $ucestalost === 'godisnje'
+                    ? $sledeci->addYearsNoOverflow()
+                    : $sledeci->addMonthNoOverflow();
             }
             $validated['sledeci_datum'] = $sledeci;
             unset($validated['datum_naplate']);

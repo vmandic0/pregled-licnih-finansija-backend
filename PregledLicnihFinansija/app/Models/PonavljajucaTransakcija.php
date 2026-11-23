@@ -16,6 +16,7 @@ class PonavljajucaTransakcija extends Model
         'interval_vrednost',
         'sledeci_datum',
         'aktivna',
+        'request_id',
     ];
 
     protected function casts(): array

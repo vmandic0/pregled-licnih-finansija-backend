@@ -17,6 +17,7 @@ class Transakcija extends Model
         'kolicina',
         'datum',
         'valuta',
+        'request_id',
     ];
 
     protected function casts(): array

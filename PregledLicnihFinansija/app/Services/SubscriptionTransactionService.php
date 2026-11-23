@@ -34,7 +34,9 @@ class SubscriptionTransactionService
                             'valuta' => $preferredCurrency,
                         ]);
                         $created++;
-                        $nextDate = $nextDate->addMonthNoOverflow()->day((int) $sub->dan_naplate);
+                        $nextDate = $sub->ucestalost === 'godisnje'
+                            ? $nextDate->addYearsNoOverflow()->day((int) $sub->dan_naplate)
+                            : $nextDate->addMonthNoOverflow()->day((int) $sub->dan_naplate);
                     }
 
                     $sub->update(['sledeci_datum' => $nextDate]);

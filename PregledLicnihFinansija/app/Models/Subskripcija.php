@@ -15,8 +15,10 @@ class Subskripcija extends Model
         'iznos',
         'valuta',
         'dan_naplate',
+        'ucestalost',
         'sledeci_datum',
         'aktivna',
+        'request_id',
     ];
 
     protected function casts(): array

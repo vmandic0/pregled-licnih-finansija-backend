@@ -120,6 +120,7 @@ Route::middleware(['auth:sanctum', 'throttle:authenticated-api'])->group(functio
             'ucestalost' => ['required', Rule::in(['nedeljno', 'mesecno', 'godisnje'])],
             'interval_vrednost' => ['required', 'integer', 'min:1', 'max:365'],
             'sledeci_datum' => ['required', 'date'],
+            'request_id' => ['sometimes', 'nullable', 'string', 'max:64'],
         ]);
         $klijent = Klijent::where('user_id', $request->user()->id)->first();
 
@@ -133,6 +134,15 @@ Route::middleware(['auth:sanctum', 'throttle:authenticated-api'])->group(functio
 
         if (!$kategorija) {
             return response()->json(['message' => 'Izabrana kategorija nije dostupna.'], 403);
+        }
+
+        if (!empty($validated['request_id'])) {
+            $existing = PonavljajucaTransakcija::where('klijent_id', $klijent->id)
+                ->where('request_id', $validated['request_id'])
+                ->first();
+            if ($existing) {
+                return response()->json($existing->load('kategorija'), 200);
+            }
         }
 
         $ponavljajuca = PonavljajucaTransakcija::create([

@@ -21,6 +21,7 @@ class TransakcijaController extends Controller
         'kategorija_id' => 'required|exists:kategorije,id',
         'kolicina' => 'required|numeric|decimal:0,2',
         'datum' => 'required|date',
+        'request_id' => 'sometimes|nullable|string|max:64',
     ]);
 
     /** @var User $user */
@@ -43,11 +44,24 @@ class TransakcijaController extends Controller
         ], 403);
     }
 
+    if ($request->filled('request_id')) {
+        $existing = Transakcija::where('request_id', $request->request_id)
+            ->where('klijent_id', $klijent->id)
+            ->first();
+        if ($existing) {
+            return response()->json([
+                'message' => 'Transakcija je već dodata.',
+                'transakcija' => $existing,
+            ], 200);
+        }
+    }
+
     $transakcija = Transakcija::create([
         'klijent_id' => $klijent->id,
         'kategorija_id' => $request->kategorija_id,
         'kolicina' => round((float) $request->kolicina, 2),
         'datum' => $request->datum,
+        'request_id' => $request->request_id,
     ]);
 
     $gejmifikacija = new \App\Http\Controllers\GejmifikacijaController();
