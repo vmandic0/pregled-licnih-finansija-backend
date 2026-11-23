@@ -33,6 +33,16 @@ class TransakcijaController extends Controller
         ], 403);
     }
 
+    $kategorija = Kategorija::whereKey($request->kategorija_id)
+        ->where(fn ($query) => $query->whereNull('user_id')->orWhere('user_id', $user->id))
+        ->first();
+
+    if (!$kategorija) {
+        return response()->json([
+            'message' => 'Izabrana kategorija nije dostupna.'
+        ], 403);
+    }
+
     $transakcija = Transakcija::create([
         'klijent_id' => $klijent->id,
         'kategorija_id' => $request->kategorija_id,

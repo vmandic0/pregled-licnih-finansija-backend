@@ -43,9 +43,11 @@ Route::middleware(['auth:sanctum', 'throttle:authenticated-api'])->group(functio
     // Kategorije
     Route::get('/kategorije', [KategorijaController::class, 'index']);
     Route::get('/kategorije/{id}', [KategorijaController::class, 'show']);
+    Route::post('/kategorije', [KategorijaController::class, 'store']);
+    Route::delete('/kategorije/{id}', [KategorijaController::class, 'destroy']);
     
     Route::middleware(IsAdmin::class)->group(function () {
-        Route::apiResource('kategorije', KategorijaController::class)->except(['index', 'show']);
+        Route::put('/kategorije/{id}', [KategorijaController::class, 'update']);
 
         Route::get('/admin/korisnici', [AdminController::class, 'korisnici']);
         Route::put('/admin/korisnici/{id}/uloga', [AdminController::class, 'promeniUlogu']);
@@ -116,6 +118,14 @@ Route::middleware(['auth:sanctum', 'throttle:authenticated-api'])->group(functio
 
         if (!$klijent) {
             return response()->json(['message' => 'Korisnik nije klijent.'], 403);
+        }
+
+        $kategorija = App\Models\Kategorija::whereKey($validated['kategorija_id'])
+            ->where(fn ($query) => $query->whereNull('user_id')->orWhere('user_id', $request->user()->id))
+            ->first();
+
+        if (!$kategorija) {
+            return response()->json(['message' => 'Izabrana kategorija nije dostupna.'], 403);
         }
 
         $ponavljajuca = PonavljajucaTransakcija::create([

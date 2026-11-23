@@ -10,7 +10,8 @@ class Kategorija extends Model
 
     protected $fillable = [
         'naziv',
-        'tip'
+        'tip',
+        'user_id',
     ];
 
     public function transakcije()
