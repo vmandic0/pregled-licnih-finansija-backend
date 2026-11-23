@@ -49,7 +49,7 @@ class SubskripcijaController extends Controller
             'naziv' => ['required', 'string', 'max:255'],
             'iznos' => ['required', 'numeric', 'gt:0'],
             'valuta' => ['required', 'string', 'size:3'],
-            'dan_naplate' => ['required', 'integer', 'between:1,28'],
+            'datum_naplate' => ['required', 'date'],
             'kategorija_id' => ['required', 'exists:kategorije,id'],
             'aktivna' => ['sometimes', 'boolean'],
         ]);
@@ -64,15 +64,21 @@ class SubskripcijaController extends Controller
             return response()->json(['message' => 'Izabrana kategorija mora biti trošak i mora biti dostupna korisniku.'], 422);
         }
 
-        $dan = (int) $validated['dan_naplate'];
-        $sledeci = CarbonImmutable::today()->day >= $dan
-            ? CarbonImmutable::today()->addMonthNoOverflow()->day($dan)
-            : CarbonImmutable::today()->day($dan);
+        $sledeci = CarbonImmutable::parse($validated['datum_naplate']);
+        if ($sledeci->lessThan(CarbonImmutable::today())) {
+            $sledeci = $sledeci->setDay(min((int) $sledeci->day, 28));
+            while ($sledeci->lessThan(CarbonImmutable::today())) {
+                $sledeci = $sledeci->addMonthNoOverflow();
+            }
+        }
+        $dan = (int) $sledeci->day;
+        unset($validated['datum_naplate']);
 
         $subskripcija = Subskripcija::create([
             ...$validated,
             'naziv' => trim($validated['naziv']),
             'valuta' => strtoupper($validated['valuta']),
+            'dan_naplate' => $dan,
             'sledeci_datum' => $sledeci,
             'klijent_id' => $klijent->id,
         ]);
@@ -89,7 +95,7 @@ class SubskripcijaController extends Controller
             'naziv' => ['sometimes', 'required', 'string', 'max:255'],
             'iznos' => ['sometimes', 'required', 'numeric', 'gt:0'],
             'valuta' => ['sometimes', 'required', 'string', 'size:3'],
-            'dan_naplate' => ['sometimes', 'required', 'integer', 'between:1,28'],
+            'datum_naplate' => ['sometimes', 'required', 'date'],
             'kategorija_id' => ['sometimes', 'required', 'exists:kategorije,id'],
             'aktivna' => ['sometimes', 'boolean'],
         ]);
@@ -107,13 +113,16 @@ class SubskripcijaController extends Controller
         if (isset($validated['valuta'])) {
             $validated['valuta'] = strtoupper($validated['valuta']);
         }
-        if (isset($validated['dan_naplate'])) {
-            $dan = (int) $validated['dan_naplate'];
+        if (isset($validated['datum_naplate'])) {
+            $sledeci = CarbonImmutable::parse($validated['datum_naplate']);
+            $dan = (int) $sledeci->day;
             $sledeci = $subskripcija->sledeci_datum->day($dan);
             if ($sledeci->lessThan(CarbonImmutable::today())) {
                 $sledeci = $sledeci->addMonthNoOverflow();
             }
             $validated['sledeci_datum'] = $sledeci;
+            unset($validated['datum_naplate']);
+            $validated['dan_naplate'] = $dan;
         }
 
         $subskripcija->update($validated);

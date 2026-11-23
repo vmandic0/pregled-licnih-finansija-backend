@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -26,6 +27,13 @@ return new class extends Migration
         Schema::table('transakcije', function (Blueprint $table) {
             $table->string('valuta', 3)->nullable()->after('datum');
         });
+
+        DB::table('kategorije')->insertOrIgnore([
+            'naziv' => 'Pretplate',
+            'tip' => 'trosak',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     public function down(): void
