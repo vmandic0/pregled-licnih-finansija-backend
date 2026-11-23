@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\GejmifikacijaController;
+use App\Http\Controllers\SubskripcijaController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\KategorijaController;
 use App\Http\Controllers\TransakcijaController;
@@ -60,6 +61,12 @@ Route::middleware(['auth:sanctum', 'throttle:authenticated-api'])->group(functio
     Route::post('/transakcije', [TransakcijaController::class, 'store']);
     Route::get('/transakcije/filter', [TransakcijaController::class, 'filter']);
     Route::delete('/transakcije/{id}', [TransakcijaController::class, 'destroy']);
+
+    Route::get('/subskripcije/popularne', [SubskripcijaController::class, 'popularne']);
+    Route::get('/subskripcije', [SubskripcijaController::class, 'index']);
+    Route::post('/subskripcije', [SubskripcijaController::class, 'store']);
+    Route::put('/subskripcije/{id}', [SubskripcijaController::class, 'update']);
+    Route::delete('/subskripcije/{id}', [SubskripcijaController::class, 'destroy']);
 
     Route::get('/ponavljajuce-transakcije', function (Request $request) {
         $klijent = Klijent::where('user_id', $request->user()->id)->first();

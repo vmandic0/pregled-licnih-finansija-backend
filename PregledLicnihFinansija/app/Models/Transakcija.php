@@ -16,6 +16,7 @@ class Transakcija extends Model
         'kategorija_id',
         'kolicina',
         'datum',
+        'valuta',
     ];
 
     protected function casts(): array
