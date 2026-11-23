@@ -19,8 +19,8 @@ class IzvestajController extends Controller
             ->orderBy('datum', 'desc')
             ->get();
 
-        $prihodi = $transakcije->filter(fn($t) => $t->kategorija->tip === 'prihod')->sum('kolicina');
-        $troskovi = $transakcije->filter(fn($t) => $t->kategorija->tip === 'trosak')->sum('kolicina');
+        $prihodi = round($transakcije->filter(fn($t) => $t->kategorija->tip === 'prihod')->sum(fn($t) => (float) $t->kolicina), 2);
+        $troskovi = round($transakcije->filter(fn($t) => $t->kategorija->tip === 'trosak')->sum(fn($t) => (float) $t->kolicina), 2);
 
         return [
             'mesec' => $mesec,

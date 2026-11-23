@@ -58,7 +58,7 @@ class Klijent extends Model
             ->get()
             ->sum(fn($k) => $k->pozajmljenaCifra * (1 + $k->kamatnaStopa / 100));
 
-        $this->net_worth = $prihodi - $troskovi - $dugovi;
+        $this->net_worth = round($prihodi - $troskovi - $dugovi, 2);
         $this->save();
     }
     public function getNetWorth(): float
@@ -81,4 +81,3 @@ class Klijent extends Model
         return $this->belongsToMany(GrupnaTransakcija::class, 'udeli_u_grupnoj_transakciji', 'klijent_id', 'grupna_transakcija_id');
     }
 }
-

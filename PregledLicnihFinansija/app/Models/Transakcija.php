@@ -22,7 +22,7 @@ class Transakcija extends Model
     protected function casts(): array
     {
         return [
-            'kolicina' => 'double',
+            'kolicina' => 'decimal:2',
             'datum' => 'date',
         ];
     }

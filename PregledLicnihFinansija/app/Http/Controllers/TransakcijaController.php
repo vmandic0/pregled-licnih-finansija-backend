@@ -19,7 +19,7 @@ class TransakcijaController extends Controller
     {
     $request->validate([
         'kategorija_id' => 'required|exists:kategorije,id',
-        'kolicina' => 'required|numeric',
+        'kolicina' => 'required|numeric|decimal:0,2',
         'datum' => 'required|date',
     ]);
 
@@ -46,7 +46,7 @@ class TransakcijaController extends Controller
     $transakcija = Transakcija::create([
         'klijent_id' => $klijent->id,
         'kategorija_id' => $request->kategorija_id,
-        'kolicina' => $request->kolicina,
+        'kolicina' => round((float) $request->kolicina, 2),
         'datum' => $request->datum,
     ]);
 

@@ -24,7 +24,7 @@ class RecurringTransactionService
                         Transakcija::create([
                             'klijent_id' => $ponavljajuca->klijent_id,
                             'kategorija_id' => $ponavljajuca->kategorija_id,
-                            'kolicina' => $ponavljajuca->kolicina,
+                            'kolicina' => round((float) $ponavljajuca->kolicina, 2),
                             'datum' => $nextDate,
                         ]);
                         $created++;

@@ -47,7 +47,7 @@ class SubskripcijaController extends Controller
     {
         $validated = $request->validate([
             'naziv' => ['required', 'string', 'max:255'],
-            'iznos' => ['required', 'numeric', 'gt:0'],
+            'iznos' => ['required', 'numeric', 'decimal:0,2', 'gt:0'],
             'valuta' => ['required', 'string', 'size:3'],
             'datum_naplate' => ['required', 'date'],
             'kategorija_id' => ['required', 'exists:kategorije,id'],
@@ -93,7 +93,7 @@ class SubskripcijaController extends Controller
 
         $validated = $request->validate([
             'naziv' => ['sometimes', 'required', 'string', 'max:255'],
-            'iznos' => ['sometimes', 'required', 'numeric', 'gt:0'],
+            'iznos' => ['sometimes', 'required', 'numeric', 'decimal:0,2', 'gt:0'],
             'valuta' => ['sometimes', 'required', 'string', 'size:3'],
             'datum_naplate' => ['sometimes', 'required', 'date'],
             'kategorija_id' => ['sometimes', 'required', 'exists:kategorije,id'],

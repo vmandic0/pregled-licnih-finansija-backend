@@ -116,7 +116,7 @@ Route::middleware(['auth:sanctum', 'throttle:authenticated-api'])->group(functio
     Route::post('/ponavljajuce-transakcije', function (Request $request) {
         $validated = $request->validate([
             'kategorija_id' => ['required', 'exists:kategorije,id'],
-            'kolicina' => ['required', 'numeric', 'gt:0'],
+            'kolicina' => ['required', 'numeric', 'decimal:0,2', 'gt:0'],
             'ucestalost' => ['required', Rule::in(['nedeljno', 'mesecno', 'godisnje'])],
             'interval_vrednost' => ['required', 'integer', 'min:1', 'max:365'],
             'sledeci_datum' => ['required', 'date'],
