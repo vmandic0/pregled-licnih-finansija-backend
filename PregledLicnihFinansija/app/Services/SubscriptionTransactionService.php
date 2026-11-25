@@ -59,15 +59,7 @@ class SubscriptionTransactionService
                     $nextDate = CarbonImmutable::parse($sub->sledeci_datum);
 
                     while ($nextDate->lessThanOrEqualTo($today)) {
-                        $amount = $this->currencyConversion->convert((float) $sub->iznos, $sub->valuta, 'RSD');
-
-                        Transakcija::create([
-                            'klijent_id' => $sub->klijent_id,
-                            'kategorija_id' => $sub->kategorija_id,
-                            'kolicina' => $amount,
-                            'datum' => $nextDate,
-                            'valuta' => 'RSD',
-                        ]);
+                        $this->createTransaction($sub, $nextDate);
                         $created++;
                         $nextDate = $this->nextDate($nextDate, $sub);
                     }
@@ -77,6 +69,25 @@ class SubscriptionTransactionService
             });
 
         return $created;
+    }
+
+    public function recordInitialCharge(Subskripcija $sub, CarbonImmutable $date): void
+    {
+        $this->createTransaction($sub, $date);
+        $sub->update(['sledeci_datum' => $this->nextDate($date, $sub)]);
+    }
+
+    private function createTransaction(Subskripcija $sub, CarbonImmutable $date): void
+    {
+        $amount = $this->currencyConversion->convert((float) $sub->iznos, $sub->valuta, 'RSD');
+
+        Transakcija::create([
+            'klijent_id' => $sub->klijent_id,
+            'kategorija_id' => $sub->kategorija_id,
+            'kolicina' => $amount,
+            'datum' => $date,
+            'valuta' => 'RSD',
+        ]);
     }
 
     private function nextDate(CarbonImmutable $date, Subskripcija $sub): CarbonImmutable

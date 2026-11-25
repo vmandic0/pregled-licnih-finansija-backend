@@ -6,8 +6,10 @@ use App\Models\Klijent;
 use App\Models\Kategorija;
 use App\Models\Subskripcija;
 use App\Services\CurrencyConversionService;
+use App\Services\SubscriptionTransactionService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class SubskripcijaController extends Controller
 {
@@ -47,7 +49,7 @@ class SubskripcijaController extends Controller
         }));
     }
 
-    public function store(Request $request)
+    public function store(Request $request, SubscriptionTransactionService $subscriptions)
     {
         $validated = $request->validate([
             'naziv' => ['required', 'string', 'max:255'],
@@ -78,6 +80,8 @@ class SubskripcijaController extends Controller
         }
         $dan = (int) $sledeci->day;
         unset($validated['datum_naplate']);
+        $aktivna = (bool) ($validated['aktivna'] ?? true);
+        $naplatiOdmah = $aktivna && $sledeci->isSameDay(CarbonImmutable::today());
 
         if (!empty($validated['request_id'])) {
             $existing = Subskripcija::where('klijent_id', $klijent->id)
@@ -88,16 +92,33 @@ class SubskripcijaController extends Controller
             }
         }
 
-        $subskripcija = Subskripcija::create([
-            ...$validated,
-            'naziv' => trim($validated['naziv']),
-            'valuta' => strtoupper($validated['valuta']),
-            'dan_naplate' => $dan,
-            'sledeci_datum' => $sledeci,
-            'klijent_id' => $klijent->id,
-        ]);
+        $subskripcija = DB::transaction(function () use (
+            $validated,
+            $klijent,
+            $dan,
+            $sledeci,
+            $aktivna,
+            $naplatiOdmah,
+            $subscriptions,
+        ) {
+            $subskripcija = Subskripcija::create([
+                ...$validated,
+                'naziv' => trim($validated['naziv']),
+                'valuta' => strtoupper($validated['valuta']),
+                'dan_naplate' => $dan,
+                'sledeci_datum' => $sledeci,
+                'aktivna' => $aktivna,
+                'klijent_id' => $klijent->id,
+            ]);
 
-        return response()->json($subskripcija->load('kategorija'), 201);
+            if ($naplatiOdmah) {
+                $subscriptions->recordInitialCharge($subskripcija, $sledeci);
+            }
+
+            return $subskripcija->fresh('kategorija');
+        });
+
+        return response()->json($subskripcija, 201);
     }
 
     public function update(Request $request, string $id)
