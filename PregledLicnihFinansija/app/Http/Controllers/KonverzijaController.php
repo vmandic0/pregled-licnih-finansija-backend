@@ -4,13 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\Klijent;
 use App\Models\User;
+use App\Services\CurrencyConversionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 
 class KonverzijaController extends Controller
 {
     // Use case 9 - Konverzija valuta
-    public function konvertuj(Request $request)
+    public function konvertuj(Request $request, CurrencyConversionService $currencyConversion)
     {
         $request->validate([
             'iznos' => 'required|numeric|min:0',
@@ -18,28 +19,10 @@ class KonverzijaController extends Controller
             'u_valutu' => 'required|string|size:3',
         ]);
 
-        $apiKey = env('EXCHANGE_RATE_API_KEY');
         $izValute = strtoupper($request->iz_valute);
         $uValutu = strtoupper($request->u_valutu);
-
-        $response = Http::get("https://v6.exchangerate-api.com/v6/{$apiKey}/pair/{$izValute}/{$uValutu}");
-
-        if (!$response->successful()) {
-            return response()->json([
-                'message' => 'Greška pri preuzimanju kursa valuta.'
-            ], 500);
-        }
-
-        $data = $response->json();
-
-        if ($data['result'] !== 'success') {
-            return response()->json([
-                'message' => 'Nevažeća valuta ili greška API-ja.'
-            ], 400);
-        }
-
-        $kurs = $data['conversion_rate'];
-        $konvertovaniIznos = $request->iznos * $kurs;
+        $kurs = $currencyConversion->rate($izValute, $uValutu);
+        $konvertovaniIznos = round((float) $request->iznos * $kurs, 2);
 
         return response()->json([
             'iz_valute' => $izValute,

@@ -5,12 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\Kredit;
 use App\Models\Klijent;
 use App\Models\User;
+use App\Services\CurrencyConversionService;
 use Illuminate\Http\Request;
 
 class KreditController extends Controller
 {
     // Use case 8 - Unos kredita
-    public function store(Request $request)
+    public function store(Request $request, CurrencyConversionService $currencyConversion)
     {
         $request->validate([
             'pozajmljenaCifra' => 'required|numeric|min:0',
@@ -22,11 +23,25 @@ class KreditController extends Controller
         $user = $request->user();
         $klijent = Klijent::where('user_id', $user->id)->first();
 
+        if (!$klijent) {
+            return response()->json(['message' => 'Korisnik nije klijent.'], 403);
+        }
+
+        $preferredCurrency = $klijent->preferred_currency ?: 'RSD';
         $kredit = Kredit::create([
             'klijent_id' => $klijent->id,
-            'pozajmljenaCifra' => $request->pozajmljenaCifra,
+            'pozajmljenaCifra' => $currencyConversion->convert(
+                (float) $request->pozajmljenaCifra,
+                $preferredCurrency,
+                'RSD',
+            ),
             'kamatnaStopa' => $request->kamatnaStopa,
-            'mesecnaRata' => $request->mesecnaRata,
+            'mesecnaRata' => $currencyConversion->convert(
+                (float) $request->mesecnaRata,
+                $preferredCurrency,
+                'RSD',
+            ),
+            'valuta' => 'RSD',
         ]);
 
         return response()->json([
@@ -78,7 +93,7 @@ class KreditController extends Controller
     }
 
     // Izmena mesecne rate kredita
-public function update(Request $request, $id)
+public function update(Request $request, $id, CurrencyConversionService $currencyConversion)
 {
     $request->validate([
         'mesecnaRata' => 'required|numeric|min:0',
@@ -87,6 +102,10 @@ public function update(Request $request, $id)
     /** @var User $user */
     $user = $request->user();
     $klijent = Klijent::where('user_id', $user->id)->first();
+
+    if (!$klijent) {
+        return response()->json(['message' => 'Korisnik nije klijent.'], 403);
+    }
 
     $kredit = Kredit::where('id', $id)
         ->where('klijent_id', $klijent->id)
@@ -99,7 +118,11 @@ public function update(Request $request, $id)
     }
 
     $kredit->update([
-        'mesecnaRata' => $request->mesecnaRata,
+        'mesecnaRata' => $currencyConversion->convert(
+            (float) $request->mesecnaRata,
+            $klijent->preferred_currency ?: 'RSD',
+            'RSD',
+        ),
     ]);
 
     return response()->json([

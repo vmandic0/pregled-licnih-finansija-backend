@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Limit;
+use App\Models\Klijent;
+use App\Services\CurrencyConversionService;
 use Illuminate\Http\Request;
 
 class LimitController extends Controller
@@ -27,19 +29,31 @@ class LimitController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(Request $request, CurrencyConversionService $currencyConversion)
     {
          $request->validate([
             'kategorija_id' => 'required|exists:kategorije,id',
             'iznos' => 'required|numeric|min:0',
         ]);
 
+        $klijent = Klijent::where('user_id', $request->user()->id)->first();
+        if (!$klijent) {
+            return response()->json(['message' => 'Korisnik nije klijent.'], 403);
+        }
+
         $limit = Limit::updateOrCreate(
             [
                 'user_id' => $request->user()->id,
                 'kategorija_id' => $request->kategorija_id,
             ],
-            ['iznos' => $request->iznos]
+            [
+                'iznos' => $currencyConversion->convert(
+                    (float) $request->iznos,
+                    $klijent->preferred_currency ?: 'RSD',
+                    'RSD',
+                ),
+                'valuta' => 'RSD',
+            ]
         );
 
         return response()->json($limit, 201);
@@ -65,10 +79,24 @@ class LimitController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, string $id)
+    public function update(Request $request, string $id, CurrencyConversionService $currencyConversion)
     {
-         $limit = Limit::where('user_id', $request->user()->id)->findOrFail($id);
-        $limit->update(['iznos' => $request->iznos]);
+        $request->validate([
+            'iznos' => 'required|numeric|min:0',
+        ]);
+        $limit = Limit::where('user_id', $request->user()->id)->findOrFail($id);
+        $klijent = Klijent::where('user_id', $request->user()->id)->first();
+        if (!$klijent) {
+            return response()->json(['message' => 'Korisnik nije klijent.'], 403);
+        }
+        $limit->update([
+            'iznos' => $currencyConversion->convert(
+                (float) $request->iznos,
+                $klijent->preferred_currency ?: 'RSD',
+                'RSD',
+            ),
+            'valuta' => 'RSD',
+        ]);
         return response()->json($limit);
     }
 

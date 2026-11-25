@@ -12,6 +12,7 @@ protected $fillable = [
     'user_id',
     'kategorija_id',
     'iznos',
+    'valuta',
 ];
 
 public function user()

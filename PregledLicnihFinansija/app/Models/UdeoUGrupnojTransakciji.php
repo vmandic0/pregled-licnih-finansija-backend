@@ -12,6 +12,7 @@ class UdeoUGrupnojTransakciji extends Model
         'grupna_transakcija_id',
         'klijent_id',
         'iznosUdela',
+        'valuta',
         'datumUplate',
     ];
 

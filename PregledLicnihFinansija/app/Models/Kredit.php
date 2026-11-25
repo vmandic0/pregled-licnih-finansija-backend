@@ -15,6 +15,7 @@ class Kredit extends Model
         'pozajmljenaCifra',
         'kamatnaStopa',
         'mesecnaRata',
+        'valuta',
     ];
 
     protected function casts(): array

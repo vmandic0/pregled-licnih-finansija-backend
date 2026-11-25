@@ -7,6 +7,7 @@ use App\Models\Klijent;
 use App\Models\Limit;
 use App\Models\Transakcija;
 use App\Models\User;
+use App\Services\CurrencyConversionService;
 use App\Services\RecurringTransactionService;
 use Illuminate\Http\Request;
 
@@ -15,7 +16,7 @@ class TransakcijaController extends Controller
     
     // Use case 3 - Unos transakcije
     
-    public function store(Request $request)
+    public function store(Request $request, CurrencyConversionService $currencyConversion)
     {
     $request->validate([
         'kategorija_id' => 'required|exists:kategorije,id',
@@ -59,8 +60,13 @@ class TransakcijaController extends Controller
     $transakcija = Transakcija::create([
         'klijent_id' => $klijent->id,
         'kategorija_id' => $request->kategorija_id,
-        'kolicina' => round((float) $request->kolicina, 2),
+        'kolicina' => $currencyConversion->convert(
+            (float) $request->kolicina,
+            $klijent->preferred_currency ?: 'RSD',
+            'RSD',
+        ),
         'datum' => $request->datum,
+        'valuta' => 'RSD',
         'request_id' => $request->request_id,
     ]);
 
@@ -127,6 +133,10 @@ class TransakcijaController extends Controller
             ->orderBy('datum', 'desc')
             ->get();
 
+        $transakcije->each(function (Transakcija $transakcija): void {
+            $transakcija->valuta = 'RSD';
+        });
+
         return response()->json($transakcije);
     }
 
@@ -153,7 +163,12 @@ class TransakcijaController extends Controller
             $query->whereBetween('datum', [$request->od, $request->do]);
         }
 
-        return response()->json($query->orderBy('datum', 'desc')->get());
+        $transakcije = $query->orderBy('datum', 'desc')->get();
+        $transakcije->each(function (Transakcija $transakcija): void {
+            $transakcija->valuta = 'RSD';
+        });
+
+        return response()->json($transakcije);
     }
 
     // Brisanje transakcije

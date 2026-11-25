@@ -15,6 +15,7 @@ use App\Http\Controllers\ProfilnaSlikaController;
 use App\Http\Controllers\AdminController;
 use Illuminate\Http\Request;
 use App\Services\FinanceNotificationService;
+use App\Services\CurrencyConversionService;
 use Illuminate\Support\Facades\Route;
 use App\Http\Middleware\IsAdmin;
 
@@ -113,7 +114,7 @@ Route::middleware(['auth:sanctum', 'throttle:authenticated-api'])->group(functio
     Route::get('/grupni-pozivi', [GrupnaTransakcijaController::class, 'pozivi']);
     Route::post('/grupni-pozivi/{id}/{odgovor}', [GrupnaTransakcijaController::class, 'odgovorNaPoziv']);
 
-    Route::post('/ponavljajuce-transakcije', function (Request $request) {
+    Route::post('/ponavljajuce-transakcije', function (Request $request, CurrencyConversionService $currencyConversion) {
         $validated = $request->validate([
             'kategorija_id' => ['required', 'exists:kategorije,id'],
             'kolicina' => ['required', 'numeric', 'decimal:0,2', 'gt:0'],
@@ -146,8 +147,18 @@ Route::middleware(['auth:sanctum', 'throttle:authenticated-api'])->group(functio
         }
 
         $ponavljajuca = PonavljajucaTransakcija::create([
-            ...$validated,
             'klijent_id' => $klijent->id,
+            'kategorija_id' => $validated['kategorija_id'],
+            'kolicina' => $currencyConversion->convert(
+                (float) $validated['kolicina'],
+                $klijent->preferred_currency ?: 'RSD',
+                'RSD',
+            ),
+            'valuta' => 'RSD',
+            'ucestalost' => $validated['ucestalost'],
+            'interval_vrednost' => $validated['interval_vrednost'],
+            'sledeci_datum' => $validated['sledeci_datum'],
+            'request_id' => $validated['request_id'] ?? null,
         ]);
 
         return response()->json($ponavljajuca->load('kategorija'), 201);
@@ -193,6 +204,7 @@ Route::middleware(['auth:sanctum', 'throttle:authenticated-api'])->group(functio
     });
 
     Route::get('/profil', [KlijentController::class, 'profil']);
+    Route::get('/rezervisana-sredstva', [KlijentController::class, 'reservedFunds']);
 
     // Konverzija valuta
     Route::get('/valute', [KonverzijaController::class, 'valute']);

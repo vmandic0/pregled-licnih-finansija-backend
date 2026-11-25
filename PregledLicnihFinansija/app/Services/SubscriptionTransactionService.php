@@ -5,11 +5,48 @@ namespace App\Services;
 use App\Models\Subskripcija;
 use App\Models\Transakcija;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
 
 class SubscriptionTransactionService
 {
+    public function __construct(private CurrencyConversionService $currencyConversion)
+    {
+    }
+
+    public function reservedAmount(
+        int $klijentId,
+        string $currency,
+        CarbonImmutable $from,
+        CarbonImmutable $through,
+    ): float {
+        $total = 0.0;
+
+        Subskripcija::where('klijent_id', $klijentId)
+            ->where('aktivna', true)
+            ->whereHas('kategorija', fn ($query) => $query->where('tip', 'trosak'))
+            ->with('klijent')
+            ->each(function (Subskripcija $sub) use ($currency, $from, $through, &$total): void {
+                $nextDate = CarbonImmutable::parse($sub->sledeci_datum);
+
+                while ($nextDate->lessThan($from)) {
+                    $nextDate = $this->nextDate($nextDate, $sub);
+                }
+
+                if ($nextDate->greaterThan($through)) {
+                    return;
+                }
+
+                $amount = $this->currencyConversion->convert((float) $sub->iznos, $sub->valuta, $currency);
+
+                while ($nextDate->lessThanOrEqualTo($through)) {
+                    $total += $amount;
+                    $nextDate = $this->nextDate($nextDate, $sub);
+                }
+            });
+
+        return round($total, 2);
+    }
+
     public function generateDue(?CarbonImmutable $today = null): int
     {
         $today ??= CarbonImmutable::today();
@@ -17,26 +54,22 @@ class SubscriptionTransactionService
 
         Subskripcija::where('aktivna', true)
             ->whereDate('sledeci_datum', '<=', $today)
-            ->with('klijent')
             ->each(function (Subskripcija $sub) use ($today, &$created): void {
                 DB::transaction(function () use ($sub, $today, &$created): void {
-                    $nextDate = $sub->sledeci_datum;
+                    $nextDate = CarbonImmutable::parse($sub->sledeci_datum);
 
                     while ($nextDate->lessThanOrEqualTo($today)) {
-                        $preferredCurrency = $sub->klijent->preferred_currency ?: 'RSD';
-                        $amount = $this->convert((float) $sub->iznos, $sub->valuta, $preferredCurrency);
+                        $amount = $this->currencyConversion->convert((float) $sub->iznos, $sub->valuta, 'RSD');
 
                         Transakcija::create([
                             'klijent_id' => $sub->klijent_id,
                             'kategorija_id' => $sub->kategorija_id,
                             'kolicina' => $amount,
                             'datum' => $nextDate,
-                            'valuta' => $preferredCurrency,
+                            'valuta' => 'RSD',
                         ]);
                         $created++;
-                        $nextDate = $sub->ucestalost === 'godisnje'
-                            ? $nextDate->addYearsNoOverflow()->day((int) $sub->dan_naplate)
-                            : $nextDate->addMonthNoOverflow()->day((int) $sub->dan_naplate);
+                        $nextDate = $this->nextDate($nextDate, $sub);
                     }
 
                     $sub->update(['sledeci_datum' => $nextDate]);
@@ -46,16 +79,11 @@ class SubscriptionTransactionService
         return $created;
     }
 
-    private function convert(float $amount, string $from, string $to): float
+    private function nextDate(CarbonImmutable $date, Subskripcija $sub): CarbonImmutable
     {
-        if ($from === $to) {
-            return round($amount, 2);
-        }
-        $apiKey = env('EXCHANGE_RATE_API_KEY');
-        $response = Http::get("https://v6.exchangerate-api.com/v6/{$apiKey}/pair/{$from}/{$to}");
-        if (!$response->successful() || $response->json('result') !== 'success') {
-            return round($amount, 2);
-        }
-        return round($amount * (float) $response->json('conversion_rate'), 2);
+        return $sub->ucestalost === 'godisnje'
+            ? $date->addYearsNoOverflow()->day((int) $sub->dan_naplate)
+            : $date->addMonthNoOverflow()->day((int) $sub->dan_naplate);
     }
+
 }

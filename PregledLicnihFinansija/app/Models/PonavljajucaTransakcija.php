@@ -12,6 +12,7 @@ class PonavljajucaTransakcija extends Model
         'klijent_id',
         'kategorija_id',
         'kolicina',
+        'valuta',
         'ucestalost',
         'interval_vrednost',
         'sledeci_datum',

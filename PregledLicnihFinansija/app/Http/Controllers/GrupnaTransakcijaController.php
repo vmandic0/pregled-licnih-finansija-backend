@@ -7,6 +7,7 @@ use App\Models\GrupnaTransakcijaPoziv;
 use App\Models\Klijent;
 use App\Models\UdeoUGrupnojTransakciji;
 use App\Models\User;
+use App\Services\CurrencyConversionService;
 use App\Services\FinanceNotificationService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -17,7 +18,7 @@ use Throwable;
 class GrupnaTransakcijaController extends Controller
 {
     // Use case 10 - Kreiranje grupe sa članovima
-    public function store(Request $request)
+    public function store(Request $request, CurrencyConversionService $currencyConversion)
     {
         $request->validate([
             'naziv' => 'required|string|max:255',
@@ -34,6 +35,12 @@ class GrupnaTransakcijaController extends Controller
         if (!$klijent) {
             return response()->json(['message' => 'Korisnik nije klijent.'], 403);
         }
+
+        $goalAmount = $currencyConversion->convert(
+            (float) $request->ciljIznos,
+            $klijent->preferred_currency ?: 'RSD',
+            'RSD',
+        );
 
         // Proveri da li su svi pozvani clanovi premium.
         if ($request->has('clanovi')) {
@@ -56,12 +63,13 @@ class GrupnaTransakcijaController extends Controller
             ->all();
 
         try {
-            [$grupnaTransakcija, $pozivi] = DB::transaction(function () use ($request, $klijent, $clanovi) {
+            [$grupnaTransakcija, $pozivi] = DB::transaction(function () use ($request, $klijent, $clanovi, $goalAmount) {
                 $grupa = GrupnaTransakcija::create([
                     'kreator_id' => $klijent->id,
                     'naziv' => $request->naziv,
-                    'ciljIznos' => $request->ciljIznos,
+                    'ciljIznos' => $goalAmount,
                     'trenutnoPrikupljeno' => 0,
+                    'valuta' => 'RSD',
                     'rok' => $request->rok,
                 ]);
 
@@ -69,6 +77,7 @@ class GrupnaTransakcijaController extends Controller
                     'grupna_transakcija_id' => $grupa->id,
                     'klijent_id' => $klijent->id,
                     'iznosUdela' => 0,
+                    'valuta' => 'RSD',
                     'datumUplate' => now(),
                 ]);
 
@@ -315,7 +324,7 @@ class GrupnaTransakcijaController extends Controller
     }
 
     // Use case 10 - Uplata udela
-    public function uplatiUdeo(Request $request, $id)
+    public function uplatiUdeo(Request $request, $id, CurrencyConversionService $currencyConversion)
     {
         $request->validate([
             'iznosUdela' => 'required|numeric|min:0',
@@ -341,14 +350,21 @@ class GrupnaTransakcijaController extends Controller
             return response()->json(['message' => 'Niste clan ove grupe.'], 403);
         }
 
+        $amount = $currencyConversion->convert(
+            (float) $request->iznosUdela,
+            $klijent->preferred_currency ?: 'RSD',
+            'RSD',
+        );
+
         $udeo = UdeoUGrupnojTransakciji::create([
             'grupna_transakcija_id' => $grupa->id,
             'klijent_id' => $klijent->id,
-            'iznosUdela' => $request->iznosUdela,
+            'iznosUdela' => $amount,
+            'valuta' => 'RSD',
             'datumUplate' => $request->datumUplate,
         ]);
 
-        $grupa->trenutnoPrikupljeno += $request->iznosUdela;
+        $grupa->trenutnoPrikupljeno += $amount;
         $grupa->save();
 
         return response()->json([

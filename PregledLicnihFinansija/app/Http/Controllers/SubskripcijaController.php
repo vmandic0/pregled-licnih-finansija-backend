@@ -5,9 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Klijent;
 use App\Models\Kategorija;
 use App\Models\Subskripcija;
+use App\Services\CurrencyConversionService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 
 class SubskripcijaController extends Controller
 {
@@ -27,7 +27,7 @@ class SubskripcijaController extends Controller
         ]);
     }
 
-    public function index(Request $request)
+    public function index(Request $request, CurrencyConversionService $currencyConversion)
     {
         $klijent = $this->klijent($request);
         $subskripcije = Subskripcija::where('klijent_id', $klijent->id)
@@ -35,8 +35,12 @@ class SubskripcijaController extends Controller
             ->orderBy('sledeci_datum')
             ->get();
 
-        return response()->json($subskripcije->map(function (Subskripcija $sub) use ($klijent) {
-            $converted = $this->convert((float) $sub->iznos, $sub->valuta, $klijent->preferred_currency ?: 'RSD');
+        return response()->json($subskripcije->map(function (Subskripcija $sub) use ($klijent, $currencyConversion) {
+            $converted = $currencyConversion->convert(
+                (float) $sub->iznos,
+                $sub->valuta,
+                $klijent->preferred_currency ?: 'RSD',
+            );
             $sub->setAttribute('iznos_u_preferiranoj_valuti', $converted);
             $sub->setAttribute('preferirana_valuta', $klijent->preferred_currency ?: 'RSD');
             return $sub;
@@ -157,16 +161,4 @@ class SubskripcijaController extends Controller
         return $klijent;
     }
 
-    private function convert(float $amount, string $from, string $to): float
-    {
-        if ($from === $to) {
-            return round($amount, 2);
-        }
-        $apiKey = env('EXCHANGE_RATE_API_KEY');
-        $response = Http::get("https://v6.exchangerate-api.com/v6/{$apiKey}/pair/{$from}/{$to}");
-        if (!$response->successful() || $response->json('result') !== 'success') {
-            return round($amount, 2);
-        }
-        return round($amount * (float) $response->json('conversion_rate'), 2);
-    }
 }

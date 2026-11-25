@@ -15,6 +15,7 @@ class GrupnaTransakcija extends Model
         'naziv',
         'ciljIznos',
         'trenutnoPrikupljeno',
+        'valuta',
         'rok',
     ];
 
