@@ -15,30 +15,37 @@ services:
       - 8000:80
     volumes:
       - ./PregledLicnihFinansija:/var/www/html/PregledLicnihFinansija
+    # Overrides .env, so the container always uses the local database.
+    environment:
+      - DB_CONNECTION=pgsql
+      - DB_URL=
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_DATABASE=licne_finansije
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=postgres
+      - DB_SSLMODE=disable
     depends_on:
       db:
         condition: service_healthy
   db:
-    image: mysql:8.0
+    image: postgres:17
     restart: always
     environment:
-      - MYSQL_DATABASE=licne_finansije
-      - MYSQL_ALLOW_EMPTY_PASSWORD=yes
+      - POSTGRES_DB=licne_finansije
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
     ports:
-      - '3306:3306'
+      - '127.0.0.1:5432:5432'
     volumes:
-      - db-data:/var/lib/mysql
+      - pg-data:/var/lib/postgresql/data
+      # Creates the test database when the volume is first initialized.
+      - ./docker/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "licne_finansije"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-# The commented out section below is an example of how to define a PostgreSQL
-# database that your application can use. `depends_on` tells Docker Compose to
-# start the database before your application. The `db-data` volume persists the
-# database data between container restarts. The `db-password` secret is used
-# to set the database password. You must create `db/password.txt` and add
-# a password of your choosing to it before running `docker-compose up`.
 volumes:
-  db-data:
+  pg-data:

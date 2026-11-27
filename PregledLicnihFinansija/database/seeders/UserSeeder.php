@@ -7,6 +7,7 @@ use App\Models\Klijent;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class UserSeeder extends Seeder
 {
@@ -39,8 +40,32 @@ class UserSeeder extends Seeder
             ['email' => 'demo@fintrack.test'],
             ['name' => 'Demo Korisnik', 'password' => Hash::make('demo1234'), 'type' => 'klijent']
         );
+        $this->markAsDemo($demo);
+
+        // Izmisljeni korisnici koje demo nalog moze da pozove u grupnu stednju.
+        // Lozinka je nasumicna, pa se niko ne prijavljuje na ove naloge.
+        $mockUsers = [
+            'ana.demo@fintrack.test' => 'Ana Primer',
+            'marko.demo@fintrack.test' => 'Marko Primer',
+            'jelena.demo@fintrack.test' => 'Jelena Primer',
+            'nikola.demo@fintrack.test' => 'Nikola Primer',
+        ];
+
+        foreach ($mockUsers as $email => $name) {
+            $this->markAsDemo(User::firstOrCreate(
+                ['email' => $email],
+                ['name' => $name, 'password' => Hash::make(Str::random(40)), 'type' => 'klijent']
+            ));
+        }
+    }
+
+    private function markAsDemo(User $user): void
+    {
+        // forceFill: is_demo namerno nije u Fillable, ne sme da dodje iz zahteva.
+        $user->forceFill(['is_demo' => true])->save();
+
         Klijent::firstOrCreate(
-            ['user_id' => $demo->id],
+            ['user_id' => $user->id],
             ['net_worth' => 0, 'premium_klijent' => true, 'preferred_currency' => 'RSD']
         );
     }

@@ -32,6 +32,14 @@ class Klijent extends Model
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * Demo accounts see only other demo accounts, and real users never see them.
+     */
+    public function scopeVisibleTo($query, Klijent $viewer)
+    {
+        return $query->whereHas('user', fn ($user) => $user->where('is_demo', (bool) $viewer->user->is_demo));
+    }
+
     public function isPremium(): bool
     {
         return $this->premium_klijent === true;

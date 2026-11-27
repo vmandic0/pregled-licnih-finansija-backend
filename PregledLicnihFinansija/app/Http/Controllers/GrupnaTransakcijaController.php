@@ -42,6 +42,13 @@ class GrupnaTransakcijaController extends Controller
             'RSD',
         );
 
+        $nedostupni = Klijent::whereIn('id', $request->input('clanovi', []))->count()
+            !== Klijent::whereIn('id', $request->input('clanovi', []))->visibleTo($klijent)->count();
+
+        if ($nedostupni) {
+            return response()->json(['message' => 'Izabrani korisnik nije dostupan.'], 403);
+        }
+
         // Proveri da li su svi pozvani clanovi premium.
         if ($request->has('clanovi')) {
             $nijePremium = Klijent::whereIn('id', $request->clanovi)
@@ -118,12 +125,13 @@ class GrupnaTransakcijaController extends Controller
 
         $users = Klijent::query()
             ->with('user:id,name,email')
+            ->visibleTo($klijent)
             ->where('id', '!=', $klijent->id)
             ->where('premium_klijent', true)
             ->when($alreadyInGroup->isNotEmpty(), fn ($query) => $query->whereNotIn('id', $alreadyInGroup))
             ->when($search !== '', fn ($query) => $query->whereHas('user', fn ($userQuery) => $userQuery
-                ->where('name', 'like', "%{$search}%")
-                ->orWhere('email', 'like', "%{$search}%")))
+                ->whereLike('name', "%{$search}%")
+                ->orWhereLike('email', "%{$search}%")))
             ->limit(20)
             ->get()
             ->map(fn (Klijent $candidate) => [
@@ -394,8 +402,13 @@ class GrupnaTransakcijaController extends Controller
             return response()->json(['message' => 'Nemate pristup ovoj grupi.'], 403);
         }
 
+        $noviClan = Klijent::visibleTo($klijent)->find($request->klijent_id);
+
+        if (!$noviClan) {
+            return response()->json(['message' => 'Izabrani korisnik nije dostupan.'], 403);
+        }
+
         // Proveri da li je novi clan premium
-        $noviClan = Klijent::find($request->klijent_id);
 
         if (!$noviClan->isPremium()) {
             return response()->json([
